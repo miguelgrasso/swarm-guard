@@ -129,6 +129,8 @@ Las pruebas son sintéticas. Los escenarios usan un modelo scripted en tests uni
 
 ## 8. Repo y reproducción
 
+Repositorio: https://github.com/miguelgrasso/swarm-guard
+
 El repo incluye IaC en CloudFormation para us-east-2 (roles IAM por agente con `Deny` explícito a acciones mutantes, log groups, dashboard y alarma de presupuesto), datos sintéticos para los 20 escenarios y un script de limpieza (`scripts/cleanup.sh`) que destruye todos los recursos y verifica que no quedan huérfanos.
 
 Los tests unitarios corren sin credenciales AWS ni acceso a red, usando un modelo scripted que responde con fixtures predefinidos:
@@ -158,7 +160,7 @@ El artículo 2 ejecuta el benchmark con Bedrock real contra los 20 escenarios. P
 
 ## Pendiente antes de publicar
 
-1. URL del repo público swarm-guard y confirmar que el tag `baseline` existe.
+1. Crear el tag `baseline` cuando termine la fase A.
 2. Verificar que el wrapper de BudgetGuard sobrevive entre invocaciones de `should_continue`.
 3. Confirmar nombres finales de los agentes (Researcher, Analyst, Writer) en `design.md`.
 4. Confirmar en el README de strands-decider-patterns las cifras de 60 llamadas LLM y 5 USD; si no aparecen, eliminar esa frase de la sección 2.
