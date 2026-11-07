@@ -20,7 +20,12 @@ from swarm_guard.models import AggregatedMetrics, RunResult
 logger = logging.getLogger(__name__)
 
 _NAMESPACE = "SwarmGuard"
-_DIMENSIONS = [["config", "scenario", "stop_reason"]]
+# Two dimension sets in the same EMF record (Requirement 5.3):
+#   - ["config", "scenario", "stop_reason"]: full per-run detail
+#   - ["config"]: aggregation-friendly; CloudWatch cannot aggregate across
+#     dimension combinations, so the Dashboard and the CostPerRun Alarm
+#     (Requirements 7.3, 7.4) rely on this set to group by configuration.
+_DIMENSIONS = [["config", "scenario", "stop_reason"], ["config"]]
 
 
 def _get_token_price() -> Optional[float]:

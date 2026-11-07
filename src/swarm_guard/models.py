@@ -7,7 +7,7 @@ Dataclasses are preferred over Pydantic to keep the unit-test stack minimal.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -96,6 +96,9 @@ class RunResult:
 
     # Correctness flag
     is_correct: bool  # actual matches expected for this config
+
+    # Raw SDK metrics (Requirement 1.7): copy of SwarmResult.accumulated_metrics
+    accumulated_metrics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

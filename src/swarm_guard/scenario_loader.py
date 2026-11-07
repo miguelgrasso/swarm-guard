@@ -38,10 +38,14 @@ def load_file(path: Path) -> ScenarioDefinition:
         A fully populated :class:`~swarm_guard.models.ScenarioDefinition`.
 
     Raises:
-        SchemaError: If any required field is missing or has the wrong type.
-        yaml.YAMLError: If the file is not valid YAML.
+        SchemaError: If any required field is missing or has the wrong type,
+            or if the file is not valid YAML (the original ``yaml.YAMLError``
+            is chained as ``__cause__``).
     """
-    raw: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        raw: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise SchemaError(f"Scenario {path.name}: invalid YAML — {exc}") from exc
 
     if not isinstance(raw, dict):
         got = type(raw).__name__

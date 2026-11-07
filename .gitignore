@@ -51,3 +51,19 @@ benchmark_*.json
 
 # Editor backups
 .kiro/hooks/*.bak
+
+# Spec board (dashboard local): logs de ejecuciones y datos generados
+.claude/spec-board/runs/
+.claude/spec-board/data.js
+
+# Hypothesis example database
+.hypothesis/
+
+# AI-DLC engine files installed into .kiro (regenerable by the aidlc installer)
+.kiro/agents/aidlc-*
+.kiro/hooks/aidlc-*
+.kiro/skills/aidlc/
+
+# spec-board mod: engine-generated types
+.claude/spec-board-mod/.claude-plugin/types/
+.claude/scheduled_tasks.lock

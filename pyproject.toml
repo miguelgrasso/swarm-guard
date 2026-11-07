@@ -6,7 +6,7 @@ readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.12"
 dependencies = [
-    "strands-agents>=1.64.0,<1.65.0",
+    "strands-agents==1.64.0",
     "PyYAML",
     "hypothesis",
 ]
@@ -24,10 +24,13 @@ dev = [
     "mypy",
     "pytest",
     "pytest-cov",
+    "types-pyyaml>=6.0.12.20261103",
 ]
 
 [tool.ruff]
 line-length = 100
+# .claude/ holds harness tooling (spec-board dashboard bridge), not project code
+extend-exclude = [".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
@@ -37,6 +40,8 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Integration tests are skipped by default; run them with `uv run pytest -m integration`
+addopts = "-m 'not integration'"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]

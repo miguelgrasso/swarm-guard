@@ -8,12 +8,20 @@ No public API exists for this value.  This interceptor adds a custom handler to
 
 Design reference: ADR-002.
 
-Verified log message patterns against strands-agents 1.64.0 source:
-  - "Max handoffs reached: <N>"
-  - "Max iterations reached: <N>"
-  - "Repetitive handoff: <N> unique nodes out of <M> recent iterations"
-  - "budget_exceeded"  (emitted by BudgetGuard)
-  - "Node '<name>' execution timed out after <N>s"
+Verified log message patterns against strands-agents 1.64.0 source
+(``strands/multiagent/swarm.py``):
+  - "Max handoffs reached: <N>"                       (should_continue, line ~212)
+  - "Max iterations reached: <N>"                     (should_continue, line ~216)
+  - "Execution timed out: <N>s"                       (should_continue, line ~221)
+  - "Repetitive handoff: <N> unique nodes out of <M> recent iterations"  (line ~231)
+  - "budget_exceeded"                                 (emitted by BudgetGuard)
+  - node timeout: the SDK raises ``Exception("Node '<name>' execution timed out after
+    <N>s")`` and logs it with ``logger.exception("node=<%s> | node execution failed")``.
+    The timeout text therefore lives in ``record.exc_info``, not in
+    ``record.getMessage()``; the interceptor inspects both.
+
+The limit messages are wrapped as ``"reason=<...> | stopping execution"`` by the
+swarm loop; the patterns match on substrings so the wrapper is irrelevant.
 """
 
 from __future__ import annotations
@@ -42,16 +50,21 @@ class StopReasonInterceptor:
         print(interceptor.recovery_time_ms)    # ms from first match to swarm end
     """
 
-    # Ordered list of (pattern_name, compiled_regex)
+    # Ordered list of (pattern_name, compiled_regex). Each regex is searched in
+    # ``record.getMessage()`` and, when present, in ``str(record.exc_info[1])``.
     PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         ("max_handoffs", re.compile(r"Max handoffs reached:")),
         ("max_iterations", re.compile(r"Max iterations reached:")),
+        ("execution_timeout", re.compile(r"Execution timed out:")),
         (
             "repetitive_handoff",
             re.compile(r"Repetitive handoff: \d+ unique nodes out of \d+"),
         ),
         ("budget_exceeded", re.compile(r"budget_exceeded")),
-        ("node_timeout", re.compile(r"execution timed out after")),
+        (
+            "node_timeout",
+            re.compile(r"execution timed out after|node execution failed"),
+        ),
     ]
 
     def __init__(self) -> None:
@@ -115,9 +128,14 @@ class StopReasonInterceptor:
             # Already captured a reason — ignore subsequent messages
             return
 
-        message = record.getMessage()
+        text = record.getMessage()
+        # logger.exception(...) puts the raised exception in exc_info; the SDK's
+        # node-timeout text travels there, so search it as well.
+        exc_info = record.exc_info
+        if exc_info is not None and exc_info[1] is not None:
+            text = f"{text}\n{exc_info[1]}"
         for pattern_name, pattern in self.PATTERNS:
-            if pattern.search(message):
+            if pattern.search(text):
                 self._detection_time = monotonic()
                 self.stop_reason = pattern_name
                 self.detection_time_ms = (self._detection_time - self._start_time) * 1000.0

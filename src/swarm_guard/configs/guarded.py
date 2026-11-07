@@ -1,4 +1,7 @@
-"""Guarded swarm configuration — all four SDK controls enabled plus BudgetGuard."""
+"""Guarded swarm configuration — all SDK controls active plus Budget Guard.
+
+Requirements: 3.2, 3.3, 3.6
+"""
 
 from __future__ import annotations
 
@@ -8,41 +11,41 @@ from swarm_guard.models import SwarmConfig
 
 
 class ConfigurationError(ValueError):
-    """Raised when a required environment variable for GuardedConfig is missing or invalid."""
+    """Raised when a required configuration value is missing or invalid."""
 
 
 def guarded_config() -> SwarmConfig:
-    """Return a SwarmConfig with all four SDK controls enabled and BudgetGuard active.
+    """Return a SwarmConfig with all controls activated.
 
-    Reads BUDGET_GUARD_MAX_TOKENS from the environment. Raises ConfigurationError
-    if the variable is absent or set to zero (which would disable the budget guard).
+    Reads BUDGET_GUARD_MAX_TOKENS from the environment.
+    Raises ConfigurationError if the variable is absent or set to 0.
 
-    Environment variables:
-        BUDGET_GUARD_MAX_TOKENS: positive integer token threshold (required)
+    SDK controls:
+    - max_handoffs=10, max_iterations=8
+    - execution_timeout=300.0, node_timeout=60.0
+    - repetitive_handoff_detection_window=6
+    - repetitive_handoff_min_unique_agents=3
+
+    Budget Guard:
+    - budget_guard_enabled=True
+    - budget_guard_max_tokens read from BUDGET_GUARD_MAX_TOKENS env var
     """
-    raw = os.environ.get("BUDGET_GUARD_MAX_TOKENS", "0")
-    try:
-        max_tokens = int(raw)
-    except ValueError:
-        raise ConfigurationError(
-            f"BUDGET_GUARD_MAX_TOKENS must be a positive integer, got: {raw!r}"
-        )
+    budget_guard_max_tokens = int(os.environ.get("BUDGET_GUARD_MAX_TOKENS", "0"))
 
-    if max_tokens == 0:
+    if budget_guard_max_tokens == 0:
         raise ConfigurationError(
-            "BUDGET_GUARD_MAX_TOKENS must be set and > 0 for GuardedConfig. "
-            "Set it in your environment (e.g. export BUDGET_GUARD_MAX_TOKENS=5000) "
-            "or in .env."
+            "BUDGET_GUARD_MAX_TOKENS environment variable must be set to a positive integer. "
+            "A value of 0 means the variable was not configured."
         )
 
     return SwarmConfig(
         max_handoffs=10,
-        max_iterations=10,
+        max_iterations=8,
         execution_timeout=300.0,
         node_timeout=60.0,
-        repetitive_handoff_detection_window=8,
+        repetitive_handoff_detection_window=6,
         repetitive_handoff_min_unique_agents=3,
         budget_guard_enabled=True,
-        budget_guard_max_tokens=max_tokens,
+        budget_guard_max_tokens=budget_guard_max_tokens,
         config_name="guarded",
     )

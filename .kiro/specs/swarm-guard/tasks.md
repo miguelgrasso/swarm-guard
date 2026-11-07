@@ -72,7 +72,7 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   **Criterio de verificación:** `mypy src/swarm_guard/models.py` pasa sin errores; se puede
   instanciar cada dataclass con sus valores por defecto y los campos coinciden con el diseño.
 
-  - [x] A3.1 Write property test for config round-trip (P8)
+  - [x] A3.1 Write property test for config round-trip (P8 / Design P10)
     - **Property P8: Config Round-Trip Stability**
     - Generar `SwarmConfig` con valores arbitrarios dentro de rangos válidos con Hypothesis,
       serializar a dict con `dataclasses.asdict()` y reconstruir; assert `config_orig == config_rebuilt`
@@ -91,8 +91,8 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
 
 - [x] A5. GuardedConfig
   - Implementar `src/swarm_guard/configs/guarded.py` con función `guarded_config() -> SwarmConfig`
-    que devuelve `SwarmConfig` con controles activos: `max_handoffs=10`, `max_iterations=10`,
-    `repetitive_handoff_detection_window=8`, `repetitive_handoff_min_unique_agents=3`,
+    que devuelve `SwarmConfig` con controles activos: `max_handoffs=10`, `max_iterations=8`,
+    `repetitive_handoff_detection_window=6`, `repetitive_handoff_min_unique_agents=3`,
     `execution_timeout=300.0`, `node_timeout=60.0`, `budget_guard_enabled=True`,
     `budget_guard_max_tokens=int(os.environ.get("BUDGET_GUARD_MAX_TOKENS", "0"))`,
     `config_name="guarded"`
@@ -102,8 +102,8 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
 
   **Criterio de verificación:** `guarded_config()` con `BUDGET_GUARD_MAX_TOKENS=5000` devuelve
   config con `budget_guard_enabled=True`, `budget_guard_max_tokens=5000`, `max_handoffs=10`,
-  `node_timeout=60.0`, `repetitive_handoff_detection_window=8`; sin la variable lanza
-  `ConfigurationError`.
+  `max_iterations=8`, `node_timeout=60.0`, `repetitive_handoff_detection_window=6`; sin la variable
+  lanza `ConfigurationError`.
 
 - [x] A6. Tres agentes especializados
   - Implementar `src/swarm_guard/agents/researcher.py`: clase `Researcher` con herramienta
@@ -118,6 +118,12 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
 
   **Criterio de verificación:** cada agente instancia correctamente con un `scripted_model`;
   `Writer` no contiene llamadas a `handoff_to_agent` en su código fuente; `mypy` pasa.
+
+  - [x] A6.1 Write property test for Writer terminal node invariant (Design P12)
+    - **Design Property P12: Writer Terminal Node Invariant**
+    - Para cualquier input string pasado al agente `Writer` con un ScriptedModel, el agente
+      debe completar sin producir una llamada a `handoff_to_agent` (es el nodo terminal del swarm)
+    - **Validates: Requirements 2.3**
 
 - [x] A7. BudgetGuard
   - Implementar `src/swarm_guard/budget_guard.py` con clase `BudgetGuard`:
@@ -167,10 +173,18 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
       no debe ser `None` ni cadena vacía
     - **Validates: Requirements 5.2 — Correctness Property P3**
 
+  - [x] A8.2 Write property test for StopReason pattern extraction (Design P14)
+    - **Design Property P14: Stop Reason Pattern Extraction**
+    - Para cualquier string de log que coincida con uno de los cinco patterns conocidos
+      (`max_handoffs`, `max_iterations`, `repetitive_handoff`, `budget_exceeded`, `node_timeout`),
+      `StopReasonInterceptor._on_record()` debe extraer y almacenar el nombre del pattern correcto
+    - Usar Hypothesis `sampled_from` sobre los cinco patterns con mensajes generados
+    - **Validates: Requirements 5.2**
+
 - [x] A9. EMFEmitter
   - Implementar `src/swarm_guard/observability/emf.py` con clase `EMFEmitter`:
     - Método de clase `emit(run_result: RunResult) -> None`: construye la estructura JSON EMF
-      con namespace `SwarmGuard`, dimensiones `[["config", "scenario", "stop_reason"]]`, y
+      con namespace `SwarmGuard`, dimensiones `[["config", "scenario", "stop_reason"], ["config"]]`, y
       las 7 métricas definidas en el diseño; escribe a `stdout` con `print(json.dumps(...))`
     - Método de clase `emit_aggregate(metrics: AggregatedMetrics, scenario: str = "__aggregate__") -> None`:
       emite `CorrectStopRate` y `FalsePositiveRate` con `scenario="__aggregate__"`
@@ -179,13 +193,14 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   - _Requirements: 5.3, 5.4, 5.5, 5.6_
 
   **Criterio de verificación:** `json.loads()` del output de `emit()` contiene el campo `"_aws"`
-  con namespace `"SwarmGuard"` y las tres dimensiones; sin `TOKEN_PRICE_PER_UNIT`, `CostPerRun == 0.0`
-  y se emite un warning al log.
+  con namespace `"SwarmGuard"` y exactamente dos dimension sets `[["config","scenario","stop_reason"],["config"]]`;
+  sin `TOKEN_PRICE_PER_UNIT`, `CostPerRun == 0.0` y se emite un warning al log.
 
   - [x] A9.1 Write property test for EMF dimension completeness (P5)
     - **Property P5: EMF Dimension Completeness**
     - Para cualquier combinación de `config`, `scenario_name`, `stop_reason` (Hypothesis `text()`),
-      el JSON EMF emitido siempre contiene las tres claves de dimensión con valores de cadena no vacíos
+      el JSON EMF emitido siempre contiene exactamente dos dimension sets:
+      `["config","scenario","stop_reason"]` y `["config"]`, con valores de cadena no vacíos
     - **Validates: Requirements 5.3 — Correctness Property P5**
 
   - [x] A9.2 Write property test for CostPerRun non-negativity (P6)
@@ -193,6 +208,13 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
     - Para cualquier `total_tokens >= 0` y cualquier `TOKEN_PRICE_PER_UNIT > 0.0` (Hypothesis
       `integers(min_value=0)` y `floats(min_value=0.0001)`), `CostPerRun >= 0.0`
     - **Validates: Requirements 5.4 — Correctness Property P6**
+
+  - [x] A9.3 Write property test for EMF metric set completeness (Design P8)
+    - **Design Property P8: EMF Metric Set Completeness**
+    - Para cualquier `RunResult`, el JSON emitido por `EMFEmitter.emit()` debe contener los siete
+      nombres de métrica: `DetectionTime`, `RecoveryTime`, `CostPerRun`, `CorrectStopRate`,
+      `FalsePositiveRate`, `TotalHandoffs`, `TotalTokens`
+    - **Validates: Requirements 5.4**
 
 - [x] A10. ScenarioLoader
   - Implementar `ScenarioLoader` en `src/swarm_guard/scenario_loader.py` (módulo separado
@@ -233,6 +255,21 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   **Criterio de verificación:** con scripted model y escenarios sintéticos, `run_benchmark`
   produce un JSON parseable con la estructura de `BenchmarkReport`; el archivo se escribe en
   `BENCHMARK_OUTPUT_DIR`; el resumen impreso contiene `CorrectStopRate` y `FalsePositiveRate`.
+
+  - [x] A11.1 Write property test for token usage propagation (Design P11)
+    - **Design Property P11: Token Usage Propagation**
+    - Para cualquier entero no negativo `T` reportado por un ScriptedModel como
+      `accumulated_usage.get("totalTokens", 0)`, el `Runner` debe producir un `RunResult`
+      donde `total_tokens == T`
+    - Usar Hypothesis `integers(min_value=0, max_value=100000)`
+    - **Validates: Requirements 1.7**
+
+  - [x] A11.2 Write property test for correctness matching logic (Design P6)
+    - **Design Property P6: Correctness Matching Logic**
+    - Para cualquier `RunResult` y `ScenarioDefinition` generados con Hypothesis, `is_correct`
+      debe ser `True` si y solo si `actual_status == expected_{config}.status` Y
+      (`actual_stop_reason == expected_{config}.stop_reason` O ambos son `None`)
+    - **Validates: Requirements 4.5, 4.6**
 
 - [x] A12. SwarmFactory
   - Implementar `SwarmFactory` como función `create_swarm()` en `src/swarm_guard/runner.py`:
@@ -312,21 +349,28 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   **Criterio de verificación:** `pytest tests/unit/ -v --ignore=tests/unit/test_defaults.py`
   pasa todos los tests sin acceso a red.
 
-- [x] A16. Tests de propiedades Hypothesis (P1–P8)
-  - Crear `tests/unit/test_properties.py` con los 8 tests de propiedades Hypothesis:
+- [x] A16. Tests de propiedades Hypothesis (P1–P8 de requirements + propiedades adicionales del diseño)
+  - Crear `tests/unit/test_properties.py` con los tests de propiedades Hypothesis:
     - P1 en función `test_p1_limit_enforcement_monotonicity` — mover/consolidar desde A14.1
     - P2 en función `test_p2_budget_guard_threshold_monotonicity` — desde A7.1
     - P3 en función `test_p3_stop_reason_always_populated_on_failed` — desde A8.1
     - P4 en función `test_p4_scenario_yaml_schema_completeness_valid` — desde A10.1
-    - P5 en función `test_p5_emf_dimension_completeness` — desde A9.1
+    - P5 en función `test_p5_emf_dimension_completeness` — desde A9.1 (verificar dos dimension sets)
     - P6 en función `test_p6_cost_per_run_non_negativity` — desde A9.2
     - P7 en función `test_p7_baseline_never_activates_budget_guard` — desde A7.2
     - P8 en función `test_p8_config_round_trip_stability` — desde A3.1
+    - `test_design_p6_correctness_matching_logic` — desde A11.2
+    - `test_design_p8_emf_metric_set_completeness` — desde A9.3
+    - `test_design_p11_token_usage_propagation` — desde A11.1
+    - `test_design_p12_writer_terminal_node_invariant` — desde A6.1
+    - `test_design_p13_stop_reason_interceptor_cleanup` — desde A8.2 (verificar que el handler
+      se remueve después de `detach()` para cualquier resultado de ejecución)
+    - `test_design_p14_stop_reason_pattern_extraction` — desde A8.2
   - Todos con `@settings(max_examples=100)` de Hypothesis
-  - _Requirements: todas las propiedades P1–P8 del documento de requirements_
+  - _Requirements: 1.3, 1.7, 2.3, 3.1, 3.2, 3.4, 3.5, 4.1, 4.2, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4_
 
-  **Criterio de verificación:** `pytest tests/unit/test_properties.py -v` ejecuta los 8 tests
-  con 100 ejemplos cada uno sin errores ni falsificaciones; tiempo total < 120s.
+  **Criterio de verificación:** `pytest tests/unit/test_properties.py -v` ejecuta todos los tests
+  con 100 ejemplos cada uno sin errores ni falsificaciones; tiempo total < 180s.
 
 - [x] A17. Script run_benchmark.py
   - Crear `scripts/run_benchmark.py` con `argparse`:
@@ -381,6 +425,13 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   `infra/parameters.json` no contiene valores no-placeholder; el template es YAML válido
   (`python -c "import yaml; yaml.safe_load(open('infra/template.yaml'))"` pasa).
 
+  - [x] A19.1 Write property test for IaC template free of hardcoded identifiers (Design P15)
+    - **Design Property P15: IaC Template Free of Hardcoded Identifiers**
+    - Parsear `infra/template.yaml` como YAML y recorrer recursivamente todos los valores de
+      cadena; ninguno debe coincidir con patrón de Account ID (`r"\b\d{12}\b"`), clave de acceso
+      (`r"AKIA[0-9A-Z]{16}"`) ni secret key; los ARNs con `!Sub` y pseudoparámetros están permitidos
+    - **Validates: Requirements 7.5**
+
 - [x] A20. Documentación completa
   - Crear `docs/adr/adr-001-swarm-vs-graph.md` expandiendo el ADR-001 del diseño al formato corto
     requerido (Contexto, Decisión, Alternativa considerada, Trade-offs con tabla)
@@ -399,141 +450,284 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   **Criterio de verificación:** los 4 ADRs existen con las secciones requeridas; el README
   contiene la sección "Resumen en español"; los 2 article outlines existen con contenido no vacío.
 
-- [ ] A21. ScriptedModel real que implementa `strands.models.Model`
+- [x] A21. ScriptedModel real que implementa `strands.models.Model`
   - Reescribir `tests/unit/conftest.py`: la fixture `scripted_model` debe devolver una instancia
     que implemente la interfaz `strands.models.Model` completa (`stream` y `structured_output`)
   - Las respuestas sintéticas deben incluir tool-use de `handoff_to_agent` con el agente destino
-    como argumento, y campos `usage` sintéticos (`inputTokens`, `outputTokens`, `totalTokens`)
+    como argumento, y campos `usage` sintéticos con la forma exacta del dict del SDK:
+    `{"inputTokens": N, "outputTokens": N, "totalTokens": N}` — accedidos con
+    `.get("totalTokens", 0)`, no como atributo de objeto
   - El modelo debe aceptar una lista de respuestas predefinidas (`responses: list[str]`) y ciclar
     por ellas; cuando se agota la lista, repetir la última respuesta
-  - Añadir variantes: respuesta de handoff, respuesta terminal (sin handoff), respuesta con tokens
-    altos (para tests de BudgetGuard)
+  - Añadir variantes de fixture en `conftest.py`:
+    - `handoff_response`: respuesta con `handoff_to_agent` al siguiente agente
+    - `terminal_response`: respuesta sin `handoff_to_agent` (nodo terminal)
+    - `token_heavy_response(n: int)`: respuesta con `totalTokens=n` en `usage` para tests de BudgetGuard
   - _Requirements: 1.1, 8.2, 8.3_
 
   **Criterio de verificación:** `Swarm([agent], ...)` con el nuevo ScriptedModel completa una
-  ejecución real offline sin llamadas de red; `pytest tests/unit/conftest.py --collect-only` pasa.
+  ejecución real offline sin llamadas de red; `pytest tests/unit/conftest.py --collect-only` pasa;
+  `accumulated_usage.get("totalTokens", 0)` retorna el valor sintético correcto.
 
-- [ ] A22. BudgetGuard como BudgetAwareSwarm + test con Swarm real
+- [x] A22. BudgetGuard reimplementado como BudgetAwareSwarm + tests con Swarm real
   - Reimplementar `src/swarm_guard/budget_guard.py`: eliminar clase `BudgetGuard` con método
-    `inject`; implementar `BudgetAwareSwarm(Swarm)` que sobreescribe `stream_async` para verificar
-    `self.state.accumulated_usage.get("totalTokens", 0)` en cada iteración y emitir
-    `logger.debug("budget_exceeded")` antes de retornar cuando supera el umbral
-  - Actualizar `src/swarm_guard/configs/guarded.py`: fijar `repetitive_handoff_detection_window=6`,
-    `max_iterations=8`, `max_handoffs=10`; usar `BudgetAwareSwarm` cuando `budget_guard_enabled`
-  - Actualizar `src/swarm_guard/runner.py` (`create_swarm`): instanciar `BudgetAwareSwarm` cuando
-    `config.budget_guard_enabled`
+    `inject`; implementar `BudgetAwareSwarm(Swarm)` que sobreescribe `stream_async` para
+    verificar `self.state.accumulated_usage.get("totalTokens", 0)` en cada iteración y emitir
+    `logger.debug("budget_exceeded")` antes de retornar cuando supera el umbral configurado:
+    ```python
+    class BudgetAwareSwarm(Swarm):
+        def __init__(self, *args, max_tokens: int, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            self._max_tokens = max_tokens
+
+        async def stream_async(self, prompt: str, **kwargs):
+            async for event in super().stream_async(prompt, **kwargs):
+                tokens = self.state.accumulated_usage.get("totalTokens", 0)
+                if tokens > self._max_tokens:
+                    logger.debug("budget_exceeded")
+                    return
+                yield event
+    ```
+  - Este diseño sobrevive el `self.state = SwarmState(...)` reset en `Swarm.stream_async`
+    (swarm.py ~465) porque el override vive en la clase, no en la instancia de estado
+  - Actualizar `src/swarm_guard/configs/guarded.py`: fijar valores escalonados
+    `max_handoffs=10`, `max_iterations=8`, `repetitive_handoff_detection_window=6`,
+    `repetitive_handoff_min_unique_agents=3`; la función `guarded_config()` exporta estos valores
+  - Actualizar `src/swarm_guard/runner.py` (`create_swarm`): instanciar `BudgetAwareSwarm` en
+    lugar de `Swarm` cuando `config.budget_guard_enabled`, pasando `max_tokens=config.budget_guard_max_tokens`
+    como kwarg adicional; con `BaselineConfig` seguir usando `Swarm` directamente
   - Actualizar `tests/unit/test_budget_guard.py`: reescribir para ejecutar un `BudgetAwareSwarm`
-    real con ScriptedModel; verificar que termina con `stop_reason == "budget_exceeded"` cuando
-    los tokens sintéticos superan el umbral
-  - Añadir test: `create_swarm(guarded_config(), agents)("task")` con ScriptedModel que reporta
-    tokens crecientes afirma `stop_reason == "budget_exceeded"`
-  - _Requirements: 3.3, 3.4, 3.5, 3.6 — ADR-003 actualizado_
+    real (no mock) con el ScriptedModel de A21; verificar que termina con
+    `stop_reason == "budget_exceeded"` cuando los tokens sintéticos superan el umbral; verificar
+    que `create_swarm(guarded_config(), agents)` instancia `BudgetAwareSwarm` y no `Swarm` base
+  - _Requirements: 3.3, 3.4, 3.5, 3.6_
 
-  **Criterio de verificación:** `pytest tests/unit/test_budget_guard.py -v` pasa con Swarm real;
-  `mypy src/swarm_guard/budget_guard.py` pasa.
+  **Criterio de verificación:** `pytest tests/unit/test_budget_guard.py -v` pasa con Swarm real
+  y sin mocks sobre `Swarm`; `mypy src/swarm_guard/budget_guard.py` pasa sin errores.
 
-- [ ] A23. StopReasonInterceptor: captura vía exc_info y corrección de regexes
-  - Actualizar `src/swarm_guard/observability/stop_reason.py`: corregir los 5 patterns a los
-    strings reales del SDK v1.64.0:
-    - `max_handoffs`: buscar `"Max handoffs reached: "` en `record.getMessage()`
-    - `max_iterations`: buscar `"Max iterations reached: "` en `record.getMessage()`
-    - `repetitive_handoff`: buscar `"Repetitive handoff detected"` en `record.getMessage()`
-    - `budget_exceeded`: sin cambio (`"budget_exceeded"`)
-    - `node_timeout`: buscar `"node execution failed"` en `record.getMessage()` O
-      `"execution timed out"` en `str(record.exc_info[1])` cuando `record.exc_info` no es None
-  - Actualizar `tests/unit/test_stop_reason.py`: emitir los mensajes con los strings correctos
-    del SDK; añadir test que verifica captura vía `exc_info` para `node_timeout`
+- [x] A23. StopReasonInterceptor: regex patterns corregidos a strings reales del SDK v1.64.0
+  - Actualizar `src/swarm_guard/observability/stop_reason.py`: reemplazar los 5 patterns con
+    los strings exactos emitidos por el SDK v1.64.0:
+    - `max_handoffs`: detectar `"Max handoffs reached: "` en `record.getMessage()`
+      (formato colon-space, número variable al final)
+    - `max_iterations`: detectar `"Max iterations reached: "` en `record.getMessage()`
+    - `repetitive_handoff`: detectar `"Repetitive handoff detected"` en `record.getMessage()`
+      (string exacto, sin número)
+    - `budget_exceeded`: sin cambio — detectar `"budget_exceeded"` en `record.getMessage()`
+      (emitido por `BudgetAwareSwarm`)
+    - `node_timeout`: detectar `"node execution failed"` en `record.getMessage()` **O**
+      `"execution timed out"` en `str(record.exc_info[1])` cuando `record.exc_info is not None`
+      (el SDK lanza excepción via `logger.exception`; el texto de timeout está en `exc_info`,
+      no en el mensaje principal)
+  - Actualizar `tests/unit/test_stop_reason.py`: emitir los mensajes con los strings exactos del
+    SDK en cada test de pattern; añadir test `test_node_timeout_via_exc_info` que construye
+    un `LogRecord` con `exc_info` poblado y verifica que el interceptor captura `"node_timeout"`
   - _Requirements: 1.4, 5.1, 5.2_
 
-  **Criterio de verificación:** `pytest tests/unit/test_stop_reason.py -v` pasa con los 5 patterns
-  y el caso `exc_info`.
+  **Criterio de verificación:** `pytest tests/unit/test_stop_reason.py -v` pasa todos los 5
+  patterns más el caso `exc_info` sin errores; `mypy src/swarm_guard/observability/stop_reason.py`
+  pasa.
 
-- [ ] A24. Corregir expected de escenarios 02, 03, 07, 08, 11, 15, 17, 18, 19 + test de consistencia
-  - Actualizar los 9 archivos YAML afectados en `scenarios/adversarial/` según la tabla aprobada:
-    - 02 `ping_pong`: guarded → `repetitive_handoff`
-    - 03 `infinite_chain`: baseline → `max_handoffs`; guarded → `max_iterations`
-    - 07 `unknown_agent`: ambas configs → `COMPLETED / null` (nota: validar en B1)
-    - 08 `context_inflation`: baseline → `max_handoffs`
-    - 11 `tool_loop`: baseline → `max_handoffs`; guarded → `max_iterations`
-    - 15 `cascade_backtrack`: guarded → `repetitive_handoff`
-    - 17 `self_delegation_loop`: baseline → `max_handoffs`; guarded → `repetitive_handoff`
-    - 18 `role_conflict`: baseline → `max_handoffs`; guarded → `max_iterations`
-    - 19 `malformed_json`: guarded → `repetitive_handoff`
-  - Añadir `tests/unit/test_scenario_consistency.py` con función
-    `reachable_stop_reasons(config: SwarmConfig) -> set[str]` que calcula qué stop_reasons son
-    alcanzables dado el orden de evaluación del SDK (`max_handoffs` siempre alcanzable;
-    `max_iterations` alcanzable si `max_iterations < max_handoffs`; `repetitive_handoff` alcanzable
-    si `repetitive_handoff_detection_window < max_iterations`); y test que carga los 20 YAML y
-    verifica que ningún `expected_*.stop_reason` pide un stop_reason inalcanzable para esa config
+- [x] A24. Corregir expected outcomes de 9 escenarios YAML según tabla del diseño
+  - Actualizar los 9 archivos YAML afectados en `scenarios/adversarial/` para que los campos
+    `expected_baseline` y `expected_guarded` coincidan exactamente con la tabla aprobada en el
+    diseño:
+    - `scenario_02_ping_pong.yaml`: guarded → `stop_reason: repetitive_handoff`
+    - `scenario_03_infinite_chain.yaml`: baseline → `stop_reason: max_handoffs`;
+      guarded → `stop_reason: max_iterations`
+    - `scenario_07_unknown_agent.yaml`: ambas configs → `status: COMPLETED, stop_reason: null`
+      (el tool devuelve error y el agente probablemente responde sin handoff; validar en B1)
+    - `scenario_08_context_inflation.yaml`: baseline → `stop_reason: max_handoffs`
+      (SDK evalúa handoffs antes que iterations; con 20/20, siempre gana `max_handoffs`)
+    - `scenario_11_tool_loop.yaml`: baseline → `stop_reason: max_handoffs`;
+      guarded → `stop_reason: max_iterations`
+    - `scenario_15_cascade_backtrack.yaml`: guarded → `stop_reason: repetitive_handoff`
+    - `scenario_17_self_delegation_loop.yaml`: baseline → `stop_reason: max_handoffs`;
+      guarded → `stop_reason: repetitive_handoff`
+    - `scenario_18_role_conflict.yaml`: baseline → `stop_reason: max_handoffs`;
+      guarded → `stop_reason: max_iterations`
+    - `scenario_19_malformed_json.yaml`: guarded → `stop_reason: repetitive_handoff`
   - _Requirements: 4.1, 4.4, 4.5, 4.6_
 
-  **Criterio de verificación:** `ScenarioLoader.load_all()` pasa; `pytest tests/unit/test_scenario_consistency.py -v` pasa; ningún YAML pide un stop_reason inalcanzable.
+  **Criterio de verificación:** `ScenarioLoader.load_all()` carga los 20 archivos sin errores;
+  los 9 archivos corregidos tienen los valores exactos de la tabla del diseño; el test de
+  consistencia de A29 pasa para los 20 escenarios.
 
-- [ ] A25. EMF con segundo set de dimensiones `["config"]`
-  - Actualizar `src/swarm_guard/observability/emf.py`: cambiar `_DIMENSIONS` a
-    `[["config", "scenario", "stop_reason"], ["config"]]` para emitir ambos sets en el mismo
-    registro EMF
-  - Actualizar `tests/unit/test_properties.py` (P5): verificar que el JSON EMF contiene ambos
-    sets de dimensiones
+- [x] A25. EMF con dos sets de dimensiones `["config","scenario","stop_reason"]` y `["config"]`
+  - Actualizar `src/swarm_guard/observability/emf.py`: cambiar la lista de dimensiones en la
+    estructura `_aws.CloudWatchMetrics[0].Dimensions` a:
+    `[["config", "scenario", "stop_reason"], ["config"]]`
+    — ambos sets se emiten en el mismo registro JSON (no en dos registros separados)
+  - El segundo set `["config"]` permite que el CloudWatch Dashboard y las Alarmas agreguen
+    métricas transversalmente sin necesitar conocer los valores de `scenario` y `stop_reason`;
+    sin este set, CloudWatch no puede agregar métricas que tienen dimensiones adicionales
+  - Actualizar `tests/unit/test_properties.py` (test `test_p5_emf_dimension_completeness`):
+    verificar que el JSON EMF emitido contiene exactamente dos listas en `Dimensions`:
+    una con tres elementos `["config", "scenario", "stop_reason"]` y otra con un elemento `["config"]`
   - _Requirements: 5.3, 7.3, 7.4_
 
-  **Criterio de verificación:** `json.loads()` del output de `emit()` contiene `"Dimensions"`
-  con dos listas; `pytest tests/unit/test_properties.py::test_p5_emf_dimension_completeness -v` pasa.
+  **Criterio de verificación:** `json.loads()` del output de `emit()` tiene
+  `_aws.CloudWatchMetrics[0].Dimensions` igual a `[["config","scenario","stop_reason"],["config"]]`;
+  `pytest tests/unit/test_properties.py::test_p5_emf_dimension_completeness -v` pasa.
 
-- [ ] A26. Marker `integration`, `SWARM_CONFIG`, `accumulated_metrics`, error handling
-  - `pyproject.toml`: añadir `addopts = "-m 'not integration'"` en `[tool.pytest.ini_options]`
-    y declarar el marker `integration` para evitar warning
+- [x] A26. Correcciones de runner, config y modelos alineadas con requirements finales
   - `src/swarm_guard/runner.py`:
+    - Acceder a tokens como `result.accumulated_usage.get("totalTokens", 0)` (dict, no atributo)
+      en todos los lugares donde se lee `totalTokens`
     - Leer `SWARM_CONFIG` del entorno como config por defecto cuando `config_names` no se pasa
-    - Añadir campo `accumulated_metrics: dict` a `RunResult` en `models.py`
-    - En el bloque `except`: poner `actual_stop_reason="exception"` en el `RunResult` de error
-    - Verificar que se cargan ≥20 escenarios antes de ejecutar; abortar con mensaje claro si no
-    - Envolver `yaml.safe_load` en `ScenarioLoader` con captura de `yaml.YAMLError`
-  - _Requirements: 1.7, 3.7, 8.4_
+      explícitamente en la llamada a `run_benchmark`
+    - Verificar que `ScenarioLoader.load_all()` retorna ≥ 20 escenarios antes de ejecutar;
+      abortar con mensaje de error claro y código de salida 1 si no
+    - En el bloque `except` del loop de ejecución: registrar `actual_stop_reason="exception"`
+      (no `None`) en el `RunResult` para que el campo sea siempre no-vacío en FAILED
+    - Envolver `yaml.safe_load` dentro de `ScenarioLoader.load_file()` en captura de
+      `yaml.YAMLError`; re-lanzar como `SchemaError` con nombre de archivo para mensaje claro
+  - `src/swarm_guard/models.py`:
+    - Añadir campo `accumulated_metrics: dict = field(default_factory=dict)` a `RunResult`
+      para almacenar `accumulated_metrics` del resultado del SDK (Requirement 1.7)
+  - `src/swarm_guard/configs/guarded.py`:
+    - Confirmar que los valores son exactamente `max_handoffs=10`, `max_iterations=8`,
+      `repetitive_handoff_detection_window=6`, `repetitive_handoff_min_unique_agents=3`
+      (valores escalonados del Requirement 3.2 y glossary)
+  - `pyproject.toml`:
+    - Añadir `addopts = "-m 'not integration'"` en `[tool.pytest.ini_options]`
+    - Declarar el marker `integration` con descripción para evitar `PytestUnknownMarkWarning`
+  - _Requirements: 1.7, 3.2, 3.7, 8.4_
 
-  **Criterio de verificación:** `pytest -m integration` no ejecuta ningún test unitario;
-  `SWARM_CONFIG=baseline python -c "from src.swarm_guard.runner import run_benchmark"` no lanza
-  error de import.
+  **Criterio de verificación:** `pytest -m integration` no ejecuta ningún test unitario y no
+  emite warnings sobre markers desconocidos; `run_benchmark` con datos sintéticos produce
+  `RunResult` con `total_tokens` correcto y `accumulated_metrics` poblado.
 
-- [ ] A27. Reescribir tests tautológicos con Swarm real
-  - `tests/unit/test_defaults.py`: reescribir tests 2, 3, 4 y 6 para ejecutar un `Swarm` real
-    con ScriptedModel (usando el nuevo modelo de A21):
-    - test 2: `Swarm` con BaselineConfig y ScriptedModel que siempre hace handoff → confirmar
-      parámetros pasados al constructor
-    - test 3: `Swarm` real con ScriptedModel que siempre hace handoff → `Status.FAILED` y
-      `len(node_history) <= max_handoffs + 1`
-    - test 4: `Swarm` real con ScriptedModel que responde sin handoff → `Status.COMPLETED`
-    - test 6: `Swarm` real con BaselineConfig y ScriptedModel que reporta tokens crecientes →
-      `accumulated_usage.get("totalTokens", 0)` crece sin terminación automática
-  - `tests/unit/test_properties.py`: reescribir P1, P2, P3, P7 para ejecutar `Swarm` real:
-    - P1: Hypothesis `integers(min_value=1, max_value=10)` para `max_handoffs`; ejecutar Swarm
-      real y verificar `len(node_history) <= N + 1`
-    - P2: Hypothesis + BudgetAwareSwarm real con ScriptedModel de tokens crecientes
-    - P3: Hypothesis sobre escenarios FAILED con Swarm real
-    - P7: Hypothesis + Swarm real con BaselineConfig → no produce `budget_exceeded`
+- [x] A27. Reescribir tests tautológicos con Swarm real + Hypothesis sobre Swarm real
+  - `tests/unit/test_defaults.py`: reescribir los tests 2, 3, 4 y 6 para ejecutar un `Swarm`
+    real con el ScriptedModel de A21 (sin `MagicMock` sobre `Swarm` ni `SwarmResult`):
+    - `test_swarm_fails_on_max_handoffs`: `Swarm` real con ScriptedModel de handoffs infinitos
+      → confirmar `Status.FAILED` y `len(node_history) <= max_handoffs + 1`
+    - `test_swarm_fails_on_max_iterations`: `Swarm` real con ScriptedModel de handoffs infinitos
+      → confirmar `Status.FAILED` y `len(node_history) <= max_iterations + 1`
+    - `test_swarm_completes_on_premature_exit`: `Swarm` real con ScriptedModel de respuesta
+      terminal → confirmar `Status.COMPLETED`
+    - `test_no_native_budget_enforcement`: `Swarm` real con `BaselineConfig` y ScriptedModel que
+      reporta tokens crecientes → confirmar que `accumulated_usage.get("totalTokens", 0)` crece
+      sin que el swarm termine por presupuesto
+  - `tests/unit/test_properties.py`: reescribir P1, P2, P3 y P7 para usar Swarm real:
+    - `test_p1_limit_enforcement_monotonicity`: reducir rango a `integers(min_value=1, max_value=10)`
+      para tiempo de ejecución razonable; ejecutar `Swarm` real por cada N generado
+    - `test_p2_budget_guard_threshold_monotonicity`: usar `BudgetAwareSwarm` real con ScriptedModel
+      de tokens crecientes; verificar terminación antes de `T + step`
+    - `test_p3_stop_reason_always_populated_on_failed`: ejecutar `Swarm` real con config de límite
+      bajo; verificar `actual_stop_reason` no vacío
+    - `test_p7_baseline_never_activates_budget_guard`: usar `Swarm` real con `BaselineConfig` y
+      ScriptedModel con `totalTokens` alto; verificar `stop_reason != "budget_exceeded"`
   - _Requirements: 1.3, 1.5, 1.8, 8.3_
 
   **Criterio de verificación:** `pytest tests/unit/test_defaults.py tests/unit/test_properties.py -v`
-  pasa sin mocks de Swarm; ningún test hace `MagicMock` sobre `Swarm` o `SwarmResult`.
+  pasa sin usar `MagicMock` ni `patch` sobre `Swarm`, `SwarmResult`, ni `SwarmState`.
 
-- [ ] A28. Higiene del repo
-  - `.gitignore`: añadir `.hypothesis/`, `.kiro/agents/aidlc-*`, `.kiro/hooks/aidlc-*`,
-    `.kiro/skills/aidlc/`, `AGENTS.md` (amendment E3)
-  - Borrar archivos vacíos de la raíz si existen: `cd`, `curl`, `rm`, `sh`
-  - `.env.example`: mover comentarios inline a líneas propias (separar valor del comentario)
-  - `pyproject.toml`: actualizar pin de strands-agents a `==1.64.0` (E1); ejecutar `uv lock`
-  - Actualizar diagrama Mermaid en `design.md`: `SwarmFactory (inline en configs)` → `create_swarm() en runner.py`; `ScenarioLoader (parte de runner.py)` → `ScenarioLoader\nscenario_loader.py`
-  - Actualizar diagrama Mermaid en `README.md` si existe
-  - _Requirements: 8.5, 8.6, 8.11_
+- [x] A28. Higiene del repo
+  - `pyproject.toml`: actualizar el pin de `strands-agents` a `==1.64.0` (amendment E1 del
+    requirements); ejecutar `uv lock` para actualizar el lockfile
+  - `.gitignore`: añadir las siguientes entradas si no existen:
+    `.hypothesis/`, `.kiro/agents/aidlc-*`, `.kiro/hooks/aidlc-*`, `.kiro/skills/aidlc/`
+  - Raíz del repo: borrar los archivos basura `cd`, `curl`, `rm`, `sh` si existen (fueron
+    creados accidentalmente)
+  - `.env.example`: asegurar que los comentarios están en líneas propias separadas del valor
+    (formato `# comentario\nVARIABLE=valor`, no `VARIABLE=valor  # comentario` inline)
+  - `src/swarm_guard/runner.py`: usar el parámetro `nodes=agents` (no `agents=agents`) al
+    construir `Swarm` y `BudgetAwareSwarm`, según la API del SDK
+  - _Requirements: 1.9, 8.5, 8.6, 8.11_
 
-  **Criterio de verificación:** `.gitignore` contiene las nuevas entradas; archivos basura
-  eliminados; `uv lock` completa sin error; `grep -r "arn:aws:" infra/` solo retorna referencias
-  con pseudoparámetros CFN.
+  **Criterio de verificación:** `grep "strands-agents" pyproject.toml` muestra `==1.64.0`;
+  `.gitignore` contiene `.hypothesis/`; no existen archivos `cd`, `curl` en la raíz;
+  `uv lock` completa sin errores.
+
+- [x] A29. Crear `tests/unit/test_scenario_consistency.py`
+  - Crear `tests/unit/test_scenario_consistency.py` con la función auxiliar
+    `reachable_stop_reasons(config: SwarmConfig) -> set[str]` que calcula qué stop_reasons son
+    alcanzables según el orden de evaluación del SDK (handoffs → iterations → repetitive):
+    - `"max_handoffs"` siempre alcanzable (límite de mayor prioridad en el SDK)
+    - `"max_iterations"` alcanzable si `config.max_iterations < config.max_handoffs`
+    - `"repetitive_handoff"` alcanzable si `config.repetitive_handoff_detection_window > 0`
+      **y** `config.repetitive_handoff_detection_window < config.max_iterations`
+    - `"budget_exceeded"` alcanzable si `config.budget_guard_enabled is True`
+    - `"node_timeout"` siempre alcanzable (ruta independiente del orden de evaluación)
+    - `None` siempre alcanzable (cualquier config puede terminar con `COMPLETED/null`)
+  - Añadir test `test_all_scenarios_stop_reasons_are_reachable`:
+    - Llamar `ScenarioLoader.load_all()` para los 20 YAML
+    - Para cada escenario: verificar `expected_baseline.stop_reason` contra
+      `reachable_stop_reasons(baseline_config())`
+    - Para cada escenario: verificar `expected_guarded.stop_reason` contra
+      `reachable_stop_reasons(guarded_config())` (con `BUDGET_GUARD_MAX_TOKENS=5000` en entorno)
+    - Si algún `stop_reason` es inalcanzable: fallar con mensaje que incluye nombre del escenario
+      y el stop_reason problemático para facilitar diagnóstico
+  - _Requirements: 4.1, 4.4, 4.5, 4.6_
+
+  **Criterio de verificación:** `pytest tests/unit/test_scenario_consistency.py -v` pasa para
+  los 20 escenarios; si se introduce un YAML con `stop_reason: repetitive_handoff` para
+  `BaselineConfig` (donde `repetitive_handoff_detection_window=0`), el test falla con mensaje
+  claro que nombra el escenario y el stop_reason inalcanzable.
+
+- [x] A30. Write property test for compare script markdown output (Design P16)
+  - Añadir test `test_design_p16_compare_script_produces_valid_markdown` en
+    `tests/unit/test_properties.py`:
+    - Para cualquier dos listas de `RunResult` (una por config) con al menos un escenario,
+      `scripts/compare_runs.py` debe producir un string que contiene una tabla Markdown con
+      fila de cabecera, fila separadora y una fila de datos por cada `scenario_name` único
+    - Usar Hypothesis `lists(builds(RunResult, ...), min_size=1)` para generar los datos de entrada
+    - Invocar la función de generación de Markdown directamente (no como subproceso) extrayendo
+      la lógica de formato de `compare_runs.py` a una función importable `format_findings_table`
+  - Actualizar `scripts/compare_runs.py` para exportar `format_findings_table` como función
+    importable (sin efecto secundario al importar el módulo)
+  - _Requirements: 6.2, 6.3_
+
+  **Criterio de verificación:** `pytest tests/unit/test_properties.py::test_design_p16_compare_script_produces_valid_markdown -v`
+  pasa con 100 ejemplos; `scripts/compare_runs.py` sigue funcionando como script CLI.
+
+- [x] A31. Test offline de 40 corridas: 20 escenarios × 2 configs con Swarm real
+  - Añadir a `tests/unit/conftest.py`:
+    - `SlowScriptedModel(ScriptedModel)`: antes de emitir su respuesta espera `delay_s` con
+      `asyncio.sleep`, para que un nodo supere `node_timeout` y el SDK lo corte por la ruta real
+      (`asyncio.timeout` → `Exception("Node '<name>' execution timed out after <N>s")` →
+      `logger.exception("node=<%s> | node execution failed")`)
+    - `scenario_agents(scenario_name, *, tokens=100) -> list[Agent]`: construye los tres agentes
+      reales (`build_researcher`, `build_analyst`, `build_writer`) con un guion por escenario:
+      - pipeline normal `researcher → analyst → writer(terminal)` para `happy_path`,
+        `premature_exit`, `shared_context_injection`, `impossible_task`, `privilege_escalation`,
+        `memory_poisoning`, `data_exfiltration` (los vectores que el Swarm no puede detectar;
+        design §7.4)
+      - ping-pong `researcher ↔ analyst` para `ping_pong`, `cascade_backtrack`, `malformed_json`,
+        `self_delegation_loop`
+      - ciclo de tres `researcher → analyst → writer → researcher` para `infinite_chain`,
+        `tool_loop` (con una llamada previa a `search_knowledge_base`), `role_conflict`
+      - `self_handoff`: `researcher → researcher`
+      - `unknown_agent`: `researcher → "supervisor"` (el tool devuelve error) y luego texto
+      - `context_inflation`: ciclo de tres con `tokens=1000` por visita, para que `guarded`
+        corte por `budget_exceeded` (umbral 5000) antes de `max_iterations=8`
+      - `slow_node` (researcher lento), `zombie_agent` (analyst lento), `timeout_chain` (todos
+        lentos) con `SlowScriptedModel(delay_s=1.0)`
+  - Crear `tests/unit/test_offline_benchmark.py`:
+    - Test parametrizado `test_offline_run_matches_expected[<escenario>-<config>]` sobre los 20
+      escenarios de `load_all()` × `["baseline", "guarded"]` (40 casos): construye la config
+      (`BUDGET_GUARD_MAX_TOKENS=5000` en entorno para `guarded`), crea el swarm con
+      `create_swarm`, adjunta `StopReasonInterceptor`, ejecuta `swarm(scenario.input)` con el
+      mismo manejo de excepción del Runner, construye el `RunResult` y afirma
+      `evaluate_correctness(...) is True` con un mensaje que muestra esperado vs. real
+    - Para `slow_node`, `zombie_agent` y `timeout_chain` la config se construye con
+      `dataclasses.replace(config, node_timeout=0.4, execution_timeout=30.0)`; el override es
+      exclusivo del test (baseline espera 300 s reales) y queda documentado en el docstring
+    - Test `test_offline_benchmark_is_40_for_40`: ejecuta las 40 corridas y afirma que las 40
+      son `is_correct`, listando las que fallen
+  - _Requirements: 1.3, 1.5, 1.6, 1.8, 3.4, 4.3, 4.5, 4.6, 8.2, 8.3_
+
+  **Criterio de verificación:** `pytest tests/unit/test_offline_benchmark.py -v` pasa los 40
+  casos parametrizados y el agregado en menos de 120 s sin red ni credenciales; ningún test
+  usa `MagicMock` ni `patch` sobre `Swarm`, `SwarmResult` ni `SwarmState`; la suite completa,
+  `ruff check .` y `mypy src/` siguen en verde.
 
 - [ ] A-Checkpoint. Verificación offline completa
   - Ejecutar `uv run ruff check .` — sin errores
   - Ejecutar `uv run mypy src/` — sin errores
-  - Ejecutar `uv run pytest tests/unit/ -v` — todos los tests pasan incluyendo A21–A27
+  - Ejecutar `uv run pytest tests/unit/ -v` — todos los tests pasan incluyendo A21–A30
   - Ejecutar el test de 40 corridas offline: todos los escenarios × 2 configs con ScriptedModel
     real → 40 resultados `is_correct=True`
   - Verificar que no existen archivos `.env`, credenciales ni ARNs reales en el repo
@@ -557,16 +751,18 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
       usando Bedrock real; assert `Status.COMPLETED`
     - `test_baseline_ping_pong_bedrock`: ejecutar escenario `ping_pong`; assert `Status.FAILED`
       y `stop_reason == "max_handoffs"`
-    - `test_baseline_accumulates_usage`: verificar que `accumulated_usage.total_tokens > 0`
+    - `test_baseline_accumulates_usage`: verificar que `accumulated_usage.get("totalTokens", 0) > 0`
       después de una corrida real
   - Crear `tests/integration/test_guarded_bedrock.py`:
     - `test_guarded_budget_exceeded_bedrock`: escenario `context_inflation` con `GuardedConfig`;
       assert `stop_reason == "budget_exceeded"` y `Status.FAILED`
     - `test_guarded_stops_earlier_than_baseline`: comparar `total_handoffs` de `guarded` vs
       `baseline` para `ping_pong`; assert `guarded < baseline`
+  - Validar también escenario 07 (`unknown_agent`): si el modelo insiste en reintentar handoffs
+    en lugar de responder sin handoff, actualizar el YAML a `max_handoffs` en ambas configs
   - _Requirements: 1.1, 1.3, 1.4, 3.4, 8.4_
 
-  **Criterio de verificación:** `pytest tests/integration/ --run-integration -v` pasa todos los
+  **Criterio de verificación:** `pytest tests/integration/ -m integration -v` pasa todos los
   tests con credenciales AWS configuradas y Bedrock accesible en us-east-2.
 
 - [ ] B2. Corridas reales del benchmark
@@ -599,10 +795,13 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   - Abrir AWS Console → CloudWatch → Metrics → Namespace `SwarmGuard` y confirmar que aparecen
     las dimensiones `config`, `scenario`, `stop_reason` con datos
   - Confirmar que los 7 tipos de métrica definidos en el diseño tienen puntos de datos
+  - Verificar que el segundo set de dimensiones `["config"]` permite agregar métricas en el
+    Dashboard sin requerir valores específicos de `scenario` y `stop_reason`
   - _Requirements: 5.3, 5.4_
 
   **Criterio de verificación:** en CloudWatch Metrics existe el namespace `SwarmGuard` con al
-  menos 3 dimensiones y 7 nombres de métricas con puntos de datos del run de B2.
+  menos 3 dimensiones y 7 nombres de métricas con puntos de datos del run de B2; el Dashboard
+  muestra datos agregados por `config`.
 
 - [ ] B5. Despliegue CloudFormation (opcional)
   - Completar `infra/parameters.json` con valores reales para `dev` (sin commitear los valores)
@@ -646,6 +845,13 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
 - Los scripts en `scripts/` deben ser ejecutables directamente con `uv run python scripts/...`
   sin instalación global adicional.
 - `docs/findings.md` nunca se edita manualmente; siempre se genera con `scripts/compare_runs.py`.
+- **Amendments aplicados:** A22 usa `BudgetAwareSwarm(Swarm)` con override de `stream_async`
+  (no monkey-patch); A23 usa los strings reales del SDK v1.64.0; A25 emite dos sets de
+  dimensiones EMF; A26 accede a `accumulated_usage` como dict con `.get("totalTokens", 0)`;
+  A28 fija `strands-agents==1.64.0` (E1).
+- **Propiedades del diseño cubiertas:** requirements.md P1–P8 están en `test_properties.py`.
+  Las propiedades adicionales del design.md (P6, P8, P11, P12, P13, P14, P15, P16) se cubren
+  en A6.1, A8.2, A9.3, A11.1, A11.2, A19.1, A30 y en las funciones `test_design_p*` de A16.
 
 ---
 
@@ -660,27 +866,43 @@ graph TD
     A4["A4 — BaselineConfig"]
     A5["A5 — GuardedConfig"]
     A6["A6 — Tres Agentes"]
+    A6_1["A6.1* — P12: Writer Terminal Node"]
     A7["A7 — BudgetGuard"]
     A7_1["A7.1* — P2: Budget Threshold"]
     A7_2["A7.2* — P7: Baseline Never Budgets"]
     A8["A8 — StopReasonInterceptor"]
     A8_1["A8.1* — P3: Stop Reason on FAILED"]
+    A8_2["A8.2* — P13/P14: Pattern Extraction"]
     A9["A9 — EMFEmitter"]
     A9_1["A9.1* — P5: EMF Dimensions"]
     A9_2["A9.2* — P6: Cost Non-Negative"]
+    A9_3["A9.3* — P8: EMF Metric Set"]
     A10["A10 — ScenarioLoader"]
     A10_1["A10.1* — P4: YAML Schema"]
     A11["A11 — Runner"]
+    A11_1["A11.1* — P11: Token Propagation"]
+    A11_2["A11.2* — P6: Correctness Logic"]
     A12["A12 — SwarmFactory"]
     A13["A13 — 20 Escenarios YAML"]
     A14["A14 — test_defaults.py"]
     A14_1["A14.1* — P1: Limit Monotonicity"]
     A15["A15 — test_budget, stop, scenarios"]
-    A16["A16 — Hypothesis P1-P8"]
+    A16["A16 — Hypothesis P1-P8 + Design Props"]
     A17["A17 — run_benchmark.py"]
     A18["A18 — compare_runs.py"]
     A19["A19 — IaC CloudFormation"]
+    A19_1["A19.1* — P15: No Hardcoded IDs"]
     A20["A20 — Documentación"]
+    A21["A21 — ScriptedModel real"]
+    A22["A22 — BudgetAwareSwarm + tests"]
+    A23["A23 — StopReason SDK strings"]
+    A24["A24 — Corregir 9 YAMLs"]
+    A25["A25 — EMF dual dimensions"]
+    A26["A26 — Runner/config fixes"]
+    A27["A27 — Tests con Swarm real"]
+    A28["A28 — Higiene del repo"]
+    A29["A29 — test_scenario_consistency"]
+    A30["A30 — P16: Compare Script Markdown"]
     ACP["A-Checkpoint"]
 
     B1["B1 — Integration Tests Bedrock"]
@@ -690,7 +912,7 @@ graph TD
     B5["B5 — Deploy CloudFormation"]
     B6["B6 — Publicación Repo"]
 
-    %% Phase A dependencies
+    %% Phase A — core pipeline
     A1 --> A3
     A1 --> A6
     A1 --> A19
@@ -705,13 +927,16 @@ graph TD
     A4 --> A12
     A5 --> A12
     A6 --> A12
+    A6 --> A6_1
     A5 --> A7
     A7 --> A7_1
     A7 --> A7_2
     A7 --> A12
     A8 --> A8_1
+    A8 --> A8_2
     A9 --> A9_1
     A9 --> A9_2
+    A9 --> A9_3
     A10 --> A10_1
     A12 --> A11
     A4 --> A11
@@ -720,6 +945,8 @@ graph TD
     A8 --> A11
     A9 --> A11
     A10 --> A11
+    A11 --> A11_1
+    A11 --> A11_2
     A2 --> A14
     A4 --> A14
     A8 --> A14
@@ -731,21 +958,64 @@ graph TD
     A13 --> A15
     A11 --> A17
     A11 --> A18
+    A18 --> A30
     A14 --> A16
     A15 --> A16
     A14_1 --> A16
     A7_1 --> A16
     A7_2 --> A16
     A8_1 --> A16
+    A8_2 --> A16
     A9_1 --> A16
     A9_2 --> A16
+    A9_3 --> A16
     A10_1 --> A16
     A3_1 --> A16
+    A6_1 --> A16
+    A11_1 --> A16
+    A11_2 --> A16
+    A19 --> A19_1
+    A19_1 --> A16
     A17 --> A20
     A18 --> A20
     A19 --> A20
+
+    %% Phase A — amendment wave
+    A2 --> A21
+    A21 --> A22
+    A21 --> A23
+    A21 --> A27
+    A7 --> A22
+    A8 --> A23
+    A5 --> A22
+    A9 --> A25
+    A11 --> A26
+    A3 --> A26
+    A5 --> A26
+    A13 --> A24
+    A22 --> A27
+    A23 --> A27
+    A14 --> A27
+    A16 --> A27
+
+    %% A29 depends on A24 (corrected YAMLs) + configs + loader
+    A24 --> A29
+    A4 --> A29
+    A5 --> A29
+    A10 --> A29
+
+    %% Checkpoint gates
     A16 --> ACP
     A20 --> ACP
+    A22 --> ACP
+    A23 --> ACP
+    A24 --> ACP
+    A25 --> ACP
+    A26 --> ACP
+    A27 --> ACP
+    A28 --> ACP
+    A29 --> ACP
+    A30 --> ACP
 
     %% Phase B dependencies
     ACP --> B1
@@ -763,13 +1033,13 @@ graph TD
     classDef optional fill:#1a3a1a,stroke:#4ada4a,color:#fff
     classDef checkpoint fill:#3a2a00,stroke:#daa000,color:#fff
 
-    class A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20 phaseA
+    class A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A21,A22,A23,A24,A25,A26,A27,A28,A29,A30 phaseA
     class B1,B2,B3,B4,B5,B6 phaseB
-    class A3_1,A7_1,A7_2,A8_1,A9_1,A9_2,A10_1,A14_1 optional
+    class A3_1,A6_1,A7_1,A7_2,A8_1,A8_2,A9_1,A9_2,A9_3,A10_1,A11_1,A11_2,A14_1,A19_1 optional
     class ACP checkpoint
 ```
 
-### Parallel Execution Waves (Phase A)
+### Parallel Execution Waves (Phase A + Phase B)
 
 Las siguientes tareas son independientes y pueden ejecutarse en paralelo dentro de cada wave:
 
@@ -778,16 +1048,19 @@ Las siguientes tareas son independientes y pueden ejecutarse en paralelo dentro 
   "waves": [
     { "id": 0, "tasks": ["A1"] },
     { "id": 1, "tasks": ["A2", "A3", "A6", "A19"] },
-    { "id": 2, "tasks": ["A3.1", "A4", "A5", "A7", "A8", "A9", "A10", "A13"] },
-    { "id": 3, "tasks": ["A7.1", "A7.2", "A8.1", "A9.1", "A9.2", "A10.1", "A12"] },
+    { "id": 2, "tasks": ["A3.1", "A4", "A5", "A6.1", "A7", "A8", "A9", "A10", "A13", "A19.1"] },
+    { "id": 3, "tasks": ["A7.1", "A7.2", "A8.1", "A8.2", "A9.1", "A9.2", "A9.3", "A10.1", "A12"] },
     { "id": 4, "tasks": ["A11"] },
-    { "id": 5, "tasks": ["A14", "A17", "A18"] },
-    { "id": 6, "tasks": ["A14.1", "A15"] },
+    { "id": 5, "tasks": ["A11.1", "A11.2", "A14", "A17", "A18"] },
+    { "id": 6, "tasks": ["A14.1", "A15", "A30"] },
     { "id": 7, "tasks": ["A16", "A20"] },
-    { "id": 8, "tasks": ["B1"] },
-    { "id": 9, "tasks": ["B2"] },
-    { "id": 10, "tasks": ["B3", "B4", "B5"] },
-    { "id": 11, "tasks": ["B6"] }
+    { "id": 8, "tasks": ["A21", "A24", "A25", "A26", "A28"] },
+    { "id": 9, "tasks": ["A22", "A23"] },
+    { "id": 10, "tasks": ["A27", "A29"] },
+    { "id": 11, "tasks": ["B1"] },
+    { "id": 12, "tasks": ["B2"] },
+    { "id": 13, "tasks": ["B3", "B4", "B5"] },
+    { "id": 14, "tasks": ["B6"] }
   ]
 }
 ```

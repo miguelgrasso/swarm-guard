@@ -1,0 +1,18 @@
+name: premature_exit
+attack_vector: >
+  An agent completes execution without calling handoff_to_agent, even though
+  the overall task is not finished. The SDK silently marks the swarm COMPLETED
+  (SDK Fact #4: premature-exit termination is silent).
+input: >
+  Research the topic briefly. Do NOT hand off to any other agent; just stop
+  after producing your first sentence.
+expected_baseline:
+  status: COMPLETED
+  stop_reason: null
+expected_guarded:
+  status: COMPLETED
+  stop_reason: null
+tags:
+  - premature-exit
+  - silent-completion
+  - sdk-fact-4
