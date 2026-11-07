@@ -1,0 +1,397 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  swarm-guard benchmark infrastructure — IAM roles (one per agent with explicit Deny on
+  mutating actions), CloudWatch Log Groups, a CloudWatch Dashboard, and a budget alarm.
+  Region: us-east-2. Stack name convention: swarm-guard-{env}.
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+  Env:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment environment (dev or prod). Used in all resource names.
+
+  BudgetAlarmThresholdUSD:
+    Type: Number
+    Description: >
+      USD threshold for the CostPerRun CloudWatch Alarm.
+      The alarm fires when the sum of CostPerRun over 60 seconds exceeds this value.
+
+  BudgetAlarmSnsTopicArn:
+    Type: String
+    Default: ""
+    Description: >
+      Optional ARN of an SNS topic to notify when the budget alarm fires.
+      Leave empty to create the alarm without an action.
+
+# ---------------------------------------------------------------------------
+# Conditions
+# ---------------------------------------------------------------------------
+Conditions:
+  HasSnsAction: !Not [!Equals [!Ref BudgetAlarmSnsTopicArn, ""]]
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # -------------------------------------------------------------------------
+  # IAM Role — Researcher
+  # -------------------------------------------------------------------------
+  ResearcherRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "swarm-guard-${Env}-researcher-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: ResearcherPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Allow read-only access to S3 and Bedrock inference
+              - Sid: AllowReadOnly
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: "*"
+              # Explicit Deny on all mutating actions
+              - Sid: DenyMutatingActions
+                Effect: Deny
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:PutBucketPolicy
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:UpdateItem
+                  - iam:PassRole
+                  - sts:AssumeRole
+                  - ec2:*
+                  - lambda:InvokeFunction
+                Resource: "*"
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+  # -------------------------------------------------------------------------
+  # IAM Role — Analyst
+  # -------------------------------------------------------------------------
+  AnalystRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "swarm-guard-${Env}-analyst-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: AnalystPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: AllowReadOnly
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: "*"
+              - Sid: DenyMutatingActions
+                Effect: Deny
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:PutBucketPolicy
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:UpdateItem
+                  - iam:PassRole
+                  - sts:AssumeRole
+                  - ec2:*
+                  - lambda:InvokeFunction
+                Resource: "*"
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+  # -------------------------------------------------------------------------
+  # IAM Role — Writer
+  # -------------------------------------------------------------------------
+  WriterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "swarm-guard-${Env}-writer-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: WriterPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: AllowReadAndWrite
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:PutObject
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: "*"
+              # Writer can write S3 but must never touch IAM or STS
+              - Sid: DenyPrivilegeEscalation
+                Effect: Deny
+                Action:
+                  - iam:*
+                  - sts:AssumeRole
+                  - sts:GetFederationToken
+                  - ec2:*
+                  - lambda:InvokeFunction
+                  - dynamodb:DeleteItem
+                  - dynamodb:UpdateItem
+                Resource: "*"
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+  # -------------------------------------------------------------------------
+  # CloudWatch Log Groups
+  # -------------------------------------------------------------------------
+  ResearcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/swarm-guard/${Env}/researcher"
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+  AnalystLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/swarm-guard/${Env}/analyst"
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+  WriterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/swarm-guard/${Env}/writer"
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+  # -------------------------------------------------------------------------
+  # CloudWatch Dashboard
+  # -------------------------------------------------------------------------
+  SwarmGuardDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "SwarmGuard-${Env}"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "title": "DetectionTime (ms)",
+                "metrics": [
+                  ["SwarmGuard", "DetectionTime", "config", "baseline"],
+                  ["SwarmGuard", "DetectionTime", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Average",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "title": "RecoveryTime (ms)",
+                "metrics": [
+                  ["SwarmGuard", "RecoveryTime", "config", "baseline"],
+                  ["SwarmGuard", "RecoveryTime", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Average",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "title": "CostPerRun (USD)",
+                "metrics": [
+                  ["SwarmGuard", "CostPerRun", "config", "baseline"],
+                  ["SwarmGuard", "CostPerRun", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Sum",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "title": "CorrectStopRate",
+                "metrics": [
+                  ["SwarmGuard", "CorrectStopRate", "config", "baseline"],
+                  ["SwarmGuard", "CorrectStopRate", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Average",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "title": "FalsePositiveRate",
+                "metrics": [
+                  ["SwarmGuard", "FalsePositiveRate", "config", "baseline"],
+                  ["SwarmGuard", "FalsePositiveRate", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Average",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "title": "TotalHandoffs",
+                "metrics": [
+                  ["SwarmGuard", "TotalHandoffs", "config", "baseline"],
+                  ["SwarmGuard", "TotalHandoffs", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Sum",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "title": "TotalTokens",
+                "metrics": [
+                  ["SwarmGuard", "TotalTokens", "config", "baseline"],
+                  ["SwarmGuard", "TotalTokens", "config", "guarded"]
+                ],
+                "period": 60,
+                "stat": "Sum",
+                "region": "${AWS::Region}"
+              }
+            }
+          ]
+        }
+
+  # -------------------------------------------------------------------------
+  # CloudWatch Alarm — Budget
+  # -------------------------------------------------------------------------
+  BudgetAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swarm-guard-${Env}-budget-alarm"
+      AlarmDescription: >
+        Fires when the sum of CostPerRun over 60 seconds exceeds BudgetAlarmThresholdUSD.
+      Namespace: SwarmGuard
+      MetricName: CostPerRun
+      Dimensions:
+        - Name: config
+          Value: guarded
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: !Ref BudgetAlarmThresholdUSD
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If
+        - HasSnsAction
+        - - !Ref BudgetAlarmSnsTopicArn
+        - []
+      Tags:
+        - Key: Project
+          Value: swarm-guard
+        - Key: Env
+          Value: !Ref Env
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+  ResearcherRoleArn:
+    Description: ARN of the Researcher IAM Role
+    Value: !GetAtt ResearcherRole.Arn
+
+  AnalystRoleArn:
+    Description: ARN of the Analyst IAM Role
+    Value: !GetAtt AnalystRole.Arn
+
+  WriterRoleArn:
+    Description: ARN of the Writer IAM Role
+    Value: !GetAtt WriterRole.Arn
+
+  ResearcherLogGroupName:
+    Description: Name of the Researcher CloudWatch Log Group
+    Value: !Ref ResearcherLogGroup
+
+  AnalystLogGroupName:
+    Description: Name of the Analyst CloudWatch Log Group
+    Value: !Ref AnalystLogGroup
+
+  WriterLogGroupName:
+    Description: Name of the Writer CloudWatch Log Group
+    Value: !Ref WriterLogGroup
+
+  DashboardName:
+    Description: Name of the CloudWatch Dashboard
+    Value: !Ref SwarmGuardDashboard
+
+  BudgetAlarmArn:
+    Description: ARN of the CloudWatch Budget Alarm
+    Value: !GetAtt BudgetAlarm.Arn

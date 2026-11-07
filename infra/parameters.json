@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "<REPLACE: dev | prod>"
+  },
+  {
+    "ParameterKey": "BudgetAlarmThresholdUSD",
+    "ParameterValue": "<REPLACE: e.g. 5.0>"
+  },
+  {
+    "ParameterKey": "BudgetAlarmSnsTopicArn",
+    "ParameterValue": "<REPLACE: SNS topic ARN or leave empty string>"
+  }
+]
