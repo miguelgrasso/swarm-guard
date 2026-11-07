@@ -43,5 +43,11 @@ build/
 # AI-DLC workspace (all working files)
 aidlc/
 
+# Benchmark outputs and local findings
+docs/findings.md
+results/
+benchmark_*.json
+.verify-venv/
+
 # Editor backups
 .kiro/hooks/*.bak

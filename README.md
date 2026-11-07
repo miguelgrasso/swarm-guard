@@ -2,46 +2,142 @@
 
 The brakes on a Strands Agents Swarm come turned off from the factory. This repo measures them on and off against 20 adversarial scenarios.
 
-## Status
+## Overview
 
-Design phase. No benchmark results yet. Article 1 (design) in `docs/article-1.md`; article 2 (results) pending.
+`swarm-guard` is a reproducible benchmark that demonstrates the security controls of the Swarm pattern in Strands Agents are **disabled by default** and measures the impact of enabling them against 20 adversarial scenarios.
 
-## Findings (verified against strands-agents 1.64.0 source)
+The project compares two configurations:
 
-1. Ping-pong detection is off by default (`repetitive_handoff_detection_window=0`, `repetitive_handoff_min_unique_agents=0`).
-2. `max_handoffs` and `max_iterations` compare the same counter (`len(node_history)`); the smaller wins.
-3. On limit exceeded the swarm ends `Status.FAILED` with no exception; the reason only goes to `logger.debug`.
-4. If an agent responds without calling `handoff_to_agent`, the swarm ends `COMPLETED` even if the task is unfinished.
-5. `node_timeout` raises an internal exception the SDK captures; the result is `FAILED` and the node is not in `node_history`.
-6. No native token or cost budget; the result exposes `accumulated_usage` and `accumulated_metrics` but does not enforce them.
+| Configuration | Description |
+|---|---|
+| `baseline` | SDK defaults (max_handoffs=20, max_iterations=20, ping-pong detection off) |
+| `guarded` | 4 SDK controls enabled + custom token budget guard |
 
-## Cost guards
+Three specialized agents (researcher, analyst, writer) execute each scenario. Metrics are emitted via CloudWatch EMF with dimensions `[config, scenario, stop_reason]`.
 
-The `guarded` configuration turns on four SDK controls with lower thresholds (`max_handoffs=10`, `max_iterations=10`, `execution_timeout=300`, `node_timeout=60`, ping-pong `window=8`, `min_unique_agents=3`) plus a custom `BudgetGuard` that reads `accumulated_usage.total_tokens` between handoffs and stops the swarm when it exceeds `BUDGET_GUARD_MAX_TOKENS`.
+## Architecture
 
-## Validity limits
+```mermaid
+graph TD
+    subgraph "Entry Points"
+        CLI["scripts/run_benchmark.py\n--config --scenario"]
+        CMP["scripts/compare_runs.py"]
+    end
 
-- Tests are synthetic (scripted model with predefined fixtures).
-- Results apply to strands-agents 1.64.0 only.
-- Token prices are read from the `TOKEN_PRICE_PER_UNIT` environment variable; nothing is hardcoded.
-- AWS region is `us-east-2`.
+    subgraph "Core: src/swarm_guard/"
+        Runner["Runner\nrunner.py"]
+        Factory["SwarmFactory\n(inline in configs)"]
+        BL["BaselineConfig\nconfigs/baseline.py"]
+        GD["GuardedConfig\nconfigs/guarded.py"]
+        BG["BudgetGuard\nbudget_guard.py"]
+        SRI["StopReasonInterceptor\nobservability/stop_reason.py"]
+        EMF["EMFEmitter\nobservability/emf.py"]
+        SL["ScenarioLoader\n(part of runner.py)"]
+    end
 
-## Quick start
+    subgraph "Agents: src/swarm_guard/agents/"
+        R["Researcher\nresearcher.py"]
+        A["Analyst\nanalyst.py"]
+        W["Writer\nwriter.py"]
+    end
+
+    subgraph "Strands SDK"
+        SDK["strands.multiagent.Swarm\nSwarmConfig\nStatus\naccumulated_usage"]
+        LOG["logging.getLogger('strands')\nDEBUG level"]
+    end
+
+    subgraph "Scenarios"
+        YAML["scenarios/adversarial/\n20 x .yaml"]
+    end
+
+    subgraph "Outputs"
+        JSON["benchmark_results.json"]
+        MD["docs/findings.md"]
+        CW["CloudWatch EMF\n(stdout to CW Agent)"]
+    end
+
+    CLI --> Runner
+    Runner --> SL
+    SL --> YAML
+    Runner --> BL
+    Runner --> GD
+    BL --> Factory
+    GD --> Factory
+    GD --> BG
+    Factory --> SDK
+    Factory --> R
+    Factory --> A
+    Factory --> W
+    Runner --> SRI
+    SRI --> LOG
+    SDK --> LOG
+    Runner --> EMF
+    EMF --> CW
+    Runner --> JSON
+    CMP --> JSON
+    CMP --> MD
+    BG --> SDK
+```
+
+## Prerequisites
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) package manager
+- AWS account with access to Amazon Bedrock in `us-east-2` (for live runs only)
+
+## Quick Start
 
 ```bash
+# Install dependencies
 uv sync
+
+# Run unit tests (no AWS credentials needed)
 uv run pytest tests/unit/ -v
 ```
 
-Available after phase A (application code, scenarios and tests are not yet committed).
-
-## Cleanup
+## Running Benchmarks
 
 ```bash
+# Set environment variables
+cp .env.example .env
+# Edit .env with your settings
+
+# Run a single scenario
+uv run python scripts/run_benchmark.py --config guarded --scenario scenario_02_ping_pong
+
+# Run all scenarios with both configs
+uv run python scripts/run_benchmark.py --config all
+
+# Compare two runs and generate findings table
+uv run python scripts/compare_runs.py baseline.json guarded.json
+```
+
+## Infrastructure
+
+Infrastructure is defined as CloudFormation templates in `infra/`. All resources are created in `us-east-2`.
+
+- `infra/template.yaml` — CloudFormation stack (IAM roles, CloudWatch log groups, dashboards, budget alarm)
+- `infra/parameters.json` — Parameters without real values
+
+```bash
+# Cleanup all AWS resources and verify no orphans remain
 bash scripts/cleanup.sh
 ```
 
-Available after phase A.
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Ensure `ruff check .` and `mypy src/` pass
+4. Run `pytest tests/unit/ -v` before submitting
+5. Open a pull request
+
+Code conventions:
+
+- Identifiers and inline comments in English
+- `ruff` and `mypy --strict` must pass without errors
+- Unit tests use a scripted model (no network calls)
+- Integration tests are marked with `@pytest.mark.integration`
 
 ## Resumen en español
 
