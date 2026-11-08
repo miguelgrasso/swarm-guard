@@ -9,8 +9,9 @@ REM 1) Bridge del dashboard (si no esta corriendo ya)
 tasklist /FI "WINDOWTITLE eq spec-board-bridge*" 2>nul | find /I "python" >nul || start "spec-board-bridge" /min .venv\Scripts\python.exe .claude\spec-board\bridge.py
 echo Dashboard local: http://127.0.0.1:8787/board
 
-REM 2) Binario de Claude Code: el de la extension de VS Code (mas nuevo) o el CLI instalado
+REM 2) Binario de Claude Code: el CLI instalado (se actualiza con `claude update`) o, si falta, el de una extension
 set "CLAUDE="
+if exist "%USERPROFILE%\.local\bin\claude.exe" set "CLAUDE=%USERPROFILE%\.local\bin\claude.exe"
 for /f "delims=" %%D in ('dir /b /ad /o-n "%USERPROFILE%\.vscode\extensions\anthropic.claude-code-*" 2^>nul') do (
   if not defined CLAUDE if exist "%USERPROFILE%\.vscode\extensions\%%D\resources\native-binary\claude.exe" set "CLAUDE=%USERPROFILE%\.vscode\extensions\%%D\resources\native-binary\claude.exe"
 )

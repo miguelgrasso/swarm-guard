@@ -46,6 +46,8 @@ import gen_spec_data as gen  # noqa: E402  (same folder)
 ALLOWED_TASK = re.compile(r"^A\d+(\.\d+)?$")
 CLAUDE_CANDIDATES = [
     os.environ.get("CLAUDE_BIN", ""),
+    os.path.expanduser(r"~\.local\bin\claude.exe"),
+    r"C:\Users\Usuario\.kiro\extensions\anthropic.claude-code-2.1.319-win32-x64\resources\native-binary\claude.exe",
     r"C:\Users\Usuario\.vscode\extensions\anthropic.claude-code-2.1.282-win32-x64\resources\native-binary\claude.exe",
     r"C:\Users\Usuario\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe",
     "claude",
