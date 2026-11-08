@@ -1,32 +1,3 @@
-# BEGIN AI-DLC:gitignore
-# AI-DLC: local working files
-aidlc/active-space
-aidlc/spaces/*/intents/active-intent
-aidlc/.aidlc-clone-id
-aidlc.settings.local.json
-aidlc/.aidlc-unit-scope.json
-aidlc/.aidlc-unit-parked
-aidlc/.aidlc-claim-generations.json
-aidlc/.aidlc-unit-participant
-aidlc/.aidlc-claim-registry.json
-aidlc/.aidlc-unit-releases/
-aidlc/.aidlc-unit-merges/
-aidlc/.aidlc-active-space-*.tmp
-aidlc/active-memory/
-aidlc/.aidlc-turn-counter
-aidlc/.aidlc-readonly-latch
-aidlc/.aidlc-sessions/
-aidlc/.aidlc-request-text/
-aidlc/spaces/*/intents/.aidlc-*
-**/aidlc/spaces/*/intents/**/.aidlc-engine/
-**/aidlc/spaces/*/intents/**/.aidlc-sensors/
-aidlc/spaces/*/knowledge/documentkb/.journal/
-aidlc/spaces/*/knowledge/.sources.local.json
-aidlc/spaces/*/intents/*/runtime-graph.json
-aidlc/spaces/*/intents/*/.aidlc-*
-aidlc/diagnostics/
-# END AI-DLC:gitignore
-
 # Python / uv
 .venv/
 __pycache__/
@@ -40,30 +11,29 @@ __pycache__/
 dist/
 build/
 
-# AI-DLC workspace (all working files)
-aidlc/
-
 # Benchmark outputs and local findings
 docs/findings.md
 results/
 benchmark_*.json
 .verify-venv/
 
-# Editor backups
-.kiro/hooks/*.bak
-
-# Spec board (dashboard local): logs de ejecuciones y datos generados
-.claude/spec-board/runs/
-.claude/spec-board/data.js
-
 # Hypothesis example database
 .hypothesis/
 
-# AI-DLC engine files installed into .kiro (regenerable by the aidlc installer)
-.kiro/agents/aidlc-*
-.kiro/hooks/aidlc-*
-.kiro/skills/aidlc/
+# AI-DLC toolkit (installed locally, not part of this project)
+aidlc/
+aidlc.settings.local.json
+AGENTS.md
+.kiro/aidlc-common/
+.kiro/knowledge/
+.kiro/scopes/
+.kiro/sensors/
+.kiro/tools/
+.kiro/skills/
+.kiro/hooks/
+.kiro/agents/
+.kiro/settings/
+.kiro/steering/aidlc-*
 
-# spec-board mod: engine-generated types
-.claude/spec-board-mod/.claude-plugin/types/
-.claude/scheduled_tasks.lock
+# Claude Code mod (lives in its own repo)
+.claude/
