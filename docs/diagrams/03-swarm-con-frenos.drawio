@@ -1,0 +1,208 @@
+<mxfile host="app.diagrams.net" agent="swarm-guard/gen_diagrams.py" version="26.0.0" type="device">
+  <diagram id="Swarm-con-frenos" name="Swarm con frenos">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c2" value="&lt;b&gt;Swarm con frenos — config guarded (4 controles del SDK + BudgetGuard)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="30" y="15" width="900" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="Escenario 02 ping_pong · config &lt;b&gt;guarded&lt;/b&gt; · max_handoffs=10 · max_iterations=8 · execution_timeout=300 s · node_timeout=60 s · ventana=6 / mín. 3 agentes únicos · BudgetAwareSwarm(max_tokens=BUDGET_GUARD_MAX_TOKENS)" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#545B64;" vertex="1" parent="1">
+          <mxGeometry x="30" y="48" width="1200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="Runner&lt;br&gt;(run_benchmark.py)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#F5F7FF;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="BudgetAwareSwarm&lt;br&gt;bucle + should_continue()" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#E6F4EA;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="225" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="Researcher" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#E8ECFD;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="410" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" value="Analyst" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#E8ECFD;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="595" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" value="Amazon Bedrock&lt;br&gt;InvokeModel" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#E3E8FD;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="780" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" value="logger 'strands'&lt;br&gt;(DEBUG)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#FAFAFA;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="965" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" value="StopReason&lt;br&gt;Interceptor" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#FFF8E1;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c11" value="EMFEmitter →&lt;br&gt;Amazon CloudWatch" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};fontSize=11;fontStyle=1;rounded=1;fillColor=#FFF0F6;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="1335" y="150" width="110" height="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="c12" value="1 · attach() — handler DEBUG en logging.getLogger('strands')" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c4" target="c10">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="95.0" y="230" as="sourcePoint" />
+            <mxPoint x="1205.0" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c13" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};strokeColor=#232F3E;fillColor=#FFF8E1;" vertex="1" parent="c10">
+          <mxGeometry x="49.0" y="80" width="12" height="950" as="geometry" />
+        </mxCell>
+        <mxCell id="c14" value="2 · swarm(task)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c4" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="95.0" y="270" as="sourcePoint" />
+            <mxPoint x="280.0" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c15" value="Mismo prompt adversarial ping-pong que baseline; sólo cambia la configuración del Swarm." style="shape=note;whiteSpace=wrap;html=1;align=left;spacing=6;verticalAlign=top;size=12;fontSize=10;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="330" y="85" width="480" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="c16" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};strokeColor=#232F3E;fillColor=#E6F4EA;" vertex="1" parent="c5">
+          <mxGeometry x="49.0" y="120" width="12" height="860" as="geometry" />
+        </mxCell>
+        <mxCell id="c17" value="loop ×3" style="shape=umlFrame;whiteSpace=wrap;html=1;width=90;height=26;fontSize=11;fontStyle=1;align=left;verticalAlign=top;spacingLeft=4;strokeColor=#1D8102;fontColor=#1D8102;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="140" y="310" width="1000" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="c18" value="[6 iteraciones R→A→R→A→R→A; cada vuelta pasa por los 5 frenos antes de continuar]" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=2;fontColor=#1D8102;" vertex="1" parent="1">
+          <mxGeometry x="240" y="310" width="890" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c19" value="3 · execute(task, shared_context)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c5" target="c6">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="360" as="sourcePoint" />
+            <mxPoint x="465.0" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c20" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};strokeColor=#232F3E;fillColor=#E8ECFD;" vertex="1" parent="c6">
+          <mxGeometry x="49.0" y="210" width="12" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c21" value="4 · InvokeModel" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c6" target="c8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="465.0" y="390" as="sourcePoint" />
+            <mxPoint x="835.0" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c22" value="5 · tool_use: handoff_to_agent('analyst')" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;endArrow=open;endFill=0;strokeColor=#545B64;" edge="1" parent="1" source="c8" target="c6">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="835.0" y="420" as="sourcePoint" />
+            <mxPoint x="465.0" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c23" value="6 · handoff → node_history += researcher" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;endArrow=open;endFill=0;strokeColor=#545B64;" edge="1" parent="1" source="c6" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="465.0" y="450" as="sourcePoint" />
+            <mxPoint x="280.0" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c24" value="" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;strokeColor=#1D8102;" edge="1" parent="1" source="c5" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="465" as="sourcePoint" />
+            <mxPoint x="280.0" y="487" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="350.0" y="465" />
+              <mxPoint x="350.0" y="487" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c25" value="7 · stream_async(): totalTokens ≤ max_tokens ✓   ·   should_continue(): n &amp;lt; 10 ✓ · n &amp;lt; 8 ✓ · t &amp;lt; 300 s ✓ · nodo &amp;lt; 60 s ✓ · ventana aún no llena" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;whiteSpace=wrap;fontColor=#1D8102;" vertex="1" parent="1">
+          <mxGeometry x="356.0" y="463" width="820" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c26" value="8 · execute(task, shared_context)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c5" target="c7">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="530" as="sourcePoint" />
+            <mxPoint x="650.0" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c27" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};strokeColor=#232F3E;fillColor=#E8ECFD;" vertex="1" parent="c7">
+          <mxGeometry x="49.0" y="380" width="12" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c28" value="9 · InvokeModel" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c7" target="c8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="650.0" y="560" as="sourcePoint" />
+            <mxPoint x="835.0" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c29" value="10 · tool_use: handoff_to_agent('researcher')" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;endArrow=open;endFill=0;strokeColor=#545B64;" edge="1" parent="1" source="c8" target="c7">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="835.0" y="590" as="sourcePoint" />
+            <mxPoint x="650.0" y="590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c30" value="11 · handoff → node_history += analyst" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;endArrow=open;endFill=0;strokeColor=#545B64;" edge="1" parent="1" source="c7" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="650.0" y="620" as="sourcePoint" />
+            <mxPoint x="280.0" y="620" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c31" value="" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;strokeColor=#1D8102;" edge="1" parent="1" source="c5" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="635" as="sourcePoint" />
+            <mxPoint x="280.0" y="657" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="350.0" y="635" />
+              <mxPoint x="350.0" y="657" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c32" value="12 · mismos chequeos ✓ → sigue" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;whiteSpace=wrap;fontColor=#1D8102;" vertex="1" parent="1">
+          <mxGeometry x="356.0" y="633" width="820" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c33" value="" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;strokeColor=#D13212;" edge="1" parent="1" source="c5" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="760" as="sourcePoint" />
+            <mxPoint x="280.0" y="782" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="350.0" y="760" />
+              <mxPoint x="350.0" y="782" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c34" value="13 · should_continue(): recent = node_history[-6:] → 2 agentes únicos &amp;lt; 3 → (False, 'Repetitive handoff: 2 unique nodes out of 6 recent iterations')" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;whiteSpace=wrap;fontColor=#D13212;" vertex="1" parent="1">
+          <mxGeometry x="356.0" y="758" width="820" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c35" value="14 · logger.debug('reason=Repetitive handoff: 2 unique nodes out of 6 … | stopping execution')" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;strokeColor=#D13212;fontColor=#D13212;" edge="1" parent="1" source="c5" target="c9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="810" as="sourcePoint" />
+            <mxPoint x="1020.0" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c36" value="15 · LogRecord → regex match → stop_reason='repetitive_handoff' · detection_time_ms" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;strokeColor=#1D8102;fontColor=#1D8102;" edge="1" parent="1" source="c9" target="c10">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1020.0" y="840" as="sourcePoint" />
+            <mxPoint x="1205.0" y="840" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c37" value="16 · SwarmResult(status=FAILED, 6 nodos)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;endArrow=open;endFill=0;strokeColor=#545B64;" edge="1" parent="1" source="c5" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280.0" y="890" as="sourcePoint" />
+            <mxPoint x="95.0" y="890" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c38" value="17 · detach(swarm_end) → recovery_time_ms" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="c4" target="c10">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="95.0" y="930" as="sourcePoint" />
+            <mxPoint x="1205.0" y="930" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c39" value="18 · stop_reason, detection_time_ms, recovery_time_ms" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;endArrow=open;endFill=0;strokeColor=#545B64;" edge="1" parent="1" source="c10" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1205.0" y="960" as="sourcePoint" />
+            <mxPoint x="95.0" y="960" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c40" value="19 · EMF JSON por stdout: Namespace SwarmGuard · dims {config=guarded, scenario=ping_pong, stop_reason=repetitive_handoff} · DetectionTime · RecoveryTime · CostPerRun · TotalHandoffs · TotalTokens" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;edgeStyle=none;rounded=0;fontSize=10;strokeColor=#232F3E;strokeWidth=1.5;labelBackgroundColor=#FFFFFF;strokeColor=#BC1356;fontColor=#BC1356;" edge="1" parent="1" source="c4" target="c11">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="95.0" y="1010" as="sourcePoint" />
+            <mxPoint x="1390.0" y="1010" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c41" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;curved&quot;:0,&quot;rounded&quot;:0};strokeColor=#232F3E;fillColor=#FFF0F6;" vertex="1" parent="c11">
+          <mxGeometry x="49.0" y="860" width="12" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c42" value="Dashboard SwarmGuard-{env} compara baseline vs guarded. Alarma: Sum(CostPerRun) &amp;gt; umbral → SNS." style="shape=note;whiteSpace=wrap;html=1;align=left;spacing=6;verticalAlign=top;size=12;fontSize=10;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#232F3E;fillColor=#FFF0F6;strokeColor=#BC1356;" vertex="1" parent="1">
+          <mxGeometry x="1270.0" y="1070" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c43" value="&lt;b&gt;Qué freno dispara según el ataque&lt;/b&gt; (todos terminan en Status.FAILED y en logger.debug; el interceptor los convierte en stop_reason)&lt;br&gt;• ping-pong entre 2 agentes → &lt;b&gt;repetitive_handoff&lt;/b&gt; (ventana 6 / mín. 3 únicos) — actúa en la iteración 6, antes que el contador&lt;br&gt;• cadena de delegación infinita (3 agentes rotando) → &lt;b&gt;max_iterations=8&lt;/b&gt; / max_handoffs=10 (mismo contador: gana el menor)&lt;br&gt;• agente lento o zombie → &lt;b&gt;node_timeout=60 s&lt;/b&gt; (el nodo no entra en node_history)&lt;br&gt;• cadena de timeouts → &lt;b&gt;execution_timeout=300 s&lt;/b&gt;&lt;br&gt;• inflado de contexto / tool loop → &lt;b&gt;budget_exceeded&lt;/b&gt;: BudgetAwareSwarm corta el stream cuando accumulated_usage.totalTokens &amp;gt; max_tokens" style="shape=note;whiteSpace=wrap;html=1;align=left;spacing=8;verticalAlign=top;size=14;fontSize=11;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1240" width="820" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c44" value="&lt;b&gt;Resultado frente a baseline&lt;/b&gt;&lt;br&gt;6 invocaciones en lugar de 20 · tokens acotados por el presupuesto · la razón de parada viaja como dimensión de CloudWatch, no se pierde en DEBUG · la alarma de costo cubre lo que ningún control del SDK mide.&lt;br&gt;&lt;br&gt;&lt;b&gt;Lo que no resuelve&lt;/b&gt;: un agente que responde sin handoff produce COMPLETED aunque la tarea esté a medias; hace falta validación de salida." style="shape=note;whiteSpace=wrap;html=1;align=left;spacing=8;verticalAlign=top;size=14;fontSize=11;fillColor=#FFF2CC;strokeColor=#D6B656;fontColor=#232F3E;fillColor=#E6F4EA;strokeColor=#1D8102;" vertex="1" parent="1">
+          <mxGeometry x="890" y="1240" width="660" height="130" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
