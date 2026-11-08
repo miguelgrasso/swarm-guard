@@ -317,7 +317,8 @@ def scenario_agents(
     - ping-pong ``researcher ↔ analyst``: ping_pong, cascade_backtrack, malformed_json,
       self_delegation_loop
     - three-agent cycle ``researcher → analyst → writer → researcher``: infinite_chain,
-      tool_loop (with a tool call first), role_conflict, context_inflation (heavy tokens)
+      role_conflict, context_inflation (heavy tokens)
+    - intra-agent tool loop (no handoff, only ``node_timeout`` stops it): tool_loop
     - self_handoff: researcher → researcher; unknown_agent: researcher → "supervisor"
     - slow_node / zombie_agent / timeout_chain: one or all agents answer after ``slow_delay_s``
     """
@@ -375,7 +376,19 @@ def scenario_agents(
         "malformed_json": ping_pong(),
         "self_delegation_loop": ping_pong(),
         "infinite_chain": cycle(),
-        "tool_loop": cycle(tool_first=True),
+        "tool_loop": (
+            _script(
+                Response(
+                    tool_name="search_knowledge_base",
+                    tool_input={"query": "data"},
+                    tokens=tokens,
+                ),
+                slow=True,
+                delay_s=slow_delay_s,
+            ),
+            _script(done),
+            _script(done),
+        ),
         "role_conflict": cycle(),
         "context_inflation": cycle(tok=1000),
         "self_handoff": (_script(h("researcher", tokens), done), _script(done), _script(done)),

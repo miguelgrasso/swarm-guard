@@ -28,7 +28,7 @@ from swarm_guard.scenario_loader import load_all
 
 from .conftest import scenario_agents
 
-TIMEOUT_SCENARIOS = {"slow_node", "zombie_agent", "timeout_chain"}
+TIMEOUT_SCENARIOS = {"slow_node", "zombie_agent", "timeout_chain", "tool_loop"}
 TEST_NODE_TIMEOUT_S = 0.4
 SLOW_DELAY_S = 1.0
 CONFIGS = ("baseline", "guarded")

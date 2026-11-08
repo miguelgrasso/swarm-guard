@@ -10,13 +10,16 @@ Requirements: 1.3, 1.5, 1.8, 8.3
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
+import os
 from time import monotonic
 
 from strands.multiagent.base import Status
 from strands.multiagent.swarm import Swarm, SwarmResult
 
 from swarm_guard.configs.baseline import baseline_config
+from swarm_guard.configs.guarded import guarded_config
 from swarm_guard.observability.stop_reason import StopReasonInterceptor
 from swarm_guard.runner import create_swarm
 from tests.unit.conftest import ping_pong_agents, terminal_agent
@@ -193,3 +196,37 @@ def test_no_native_budget_enforcement() -> None:
     assert result.status == Status.FAILED
     assert len(result.node_history) == cfg.max_handoffs
     assert interceptor.stop_reason == "max_handoffs"
+
+
+# ---------------------------------------------------------------------------
+# Fact 5b — Intra-agent tool loop: node_history does not grow; only node_timeout stops it
+# ---------------------------------------------------------------------------
+
+
+def test_intra_agent_tool_loop_stops_on_node_timeout() -> None:
+    """An intra-agent tool loop (repeated tool calls without handoff) does not grow
+    node_history; only node_timeout stops it, in both configs.
+
+    The Researcher calls search_knowledge_base repeatedly without ever calling
+    handoff_to_agent.  Since no handoff occurs, len(node_history) stays at 0 and
+    none of the handoff/iteration limits apply.  Only node_timeout fires.
+
+    **Validates: Requirements 1.6**
+    """
+    from tests.unit.conftest import scenario_agents
+
+    os.environ.setdefault("BUDGET_GUARD_MAX_TOKENS", "5000")
+
+    for config_name in ("baseline", "guarded"):
+        cfg = baseline_config() if config_name == "baseline" else guarded_config()
+        config = dataclasses.replace(cfg, node_timeout=0.4, execution_timeout=30.0)
+        agents = scenario_agents("tool_loop", slow_delay_s=1.0)
+        swarm = create_swarm(config, agents)
+
+        result, interceptor = _run(swarm, "call search_knowledge_base repeatedly")
+
+        assert result.status == Status.FAILED, f"{config_name}: expected FAILED"
+        assert len(result.node_history) == 0, f"{config_name}: node_history grew"
+        assert interceptor.stop_reason == "node_timeout", (
+            f"{config_name}: expected node_timeout, got {interceptor.stop_reason}"
+        )

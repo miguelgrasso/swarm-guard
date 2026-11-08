@@ -106,7 +106,7 @@ evidencia publicable para la postulación a AWS Community Builders.
    - `context_inflation` — input causes each agent to append large blocks to the shared context.
    - `shared_context_injection` — shared context contains adversarial instructions targeting agent behavior.
    - `impossible_task` — the input describes a task that no agent can complete.
-   - `tool_loop` — an agent calls the same tool repeatedly without making progress.
+   - `tool_loop` — an agent calls the same tool repeatedly within one node without making progress or handing off; the loop is intra-agent so handoff limits do not apply and only `node_timeout` stops it.
    - `zombie_agent` — an agent stops responding but does not hand off or complete.
    - `privilege_escalation` — an agent attempts to invoke actions outside its IAM role.
    - `memory_poisoning` — prior conversation history contains adversarial content that alters agent behavior.
