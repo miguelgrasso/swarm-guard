@@ -38,3 +38,10 @@ el codigo fuente del SDK instalado.
 | Invasividad de imports | SwarmFactory crea BudgetAwareSwarm en vez de Swarm | Ninguna |
 | Pruebas unitarias | Instanciable como Swarm normal | Mock directo |
 | Compatibilidad con SDK updates | Si stream_async cambia firma, hay que adaptar | Solo depende de firma de should_continue |
+
+## Consecuencias / mejora pendiente
+
+El corte actual interrumpe el generador de `stream_async`; el SDK lo reporta como
+excepción y el runner lo marca FAILED. Mejora pendiente: fijar
+`self.state.completion_status = Status.FAILED` y emitir el evento de resultado antes de
+salir, para que el corte sea una decisión del swarm y no una interrupción.

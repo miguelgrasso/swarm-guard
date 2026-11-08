@@ -87,7 +87,7 @@ En la versión 1.64.0, según el código fuente, no existe un presupuesto nativo
 | Ping-pong | `window=6`, `min_unique=3` | Dos agentes se pasan el control | Razón = `repetitive_handoff` |
 | Presupuesto de tokens | `BudgetAwareSwarm` (propio) | Costo descontrolado | `budget_exceeded` en log |
 
-Los separamos a propósito: como comparan el mismo contador (Hallazgo 2), con valores iguales la razón `max_iterations` nunca aparece. Con 8 y 10, cada razón es alcanzable y distinguible.
+Separamos `max_handoffs` y `max_iterations` a propósito: como comparan el mismo contador (Hallazgo 2), con valores iguales la razón `max_iterations` nunca aparece. Con 8 y 10, cada razón es alcanzable y distinguible.
 
 Los primeros tres son nativos del SDK, encendidos a propósito con valores más bajos que los defaults. El cuarto es nativo pero viene apagado; lo encendemos con `repetitive_handoff_detection_window=6` y `repetitive_handoff_min_unique_agents=3`. El quinto no existe en el SDK.
 
@@ -107,9 +107,9 @@ Sin capturar la razón de parada no distingues "paró por ping-pong" de "falló 
 }
 ```
 
-El segundo set, solo `config`, existe porque CloudWatch no agrega entre dimensiones: sin él, el dashboard y la alarma por configuración no verían datos.
-
 Sin esa dimensión, un dashboard de CloudWatch muestra que el swarm falló, pero no por qué. Con ella, puedes segmentar y comparar: los fallos de baseline, ¿son todos `max_handoffs`? Los de guarded, ¿son `repetitive_handoff` o `budget_exceeded`? Esa es la pregunta que el artículo 2 responde con números.
+
+El segundo set, solo `config`, existe porque CloudWatch no agrega entre dimensiones: sin él, el dashboard y la alarma por configuración no verían datos.
 
 ## 6. Cómo lo vamos a medir
 
