@@ -81,15 +81,17 @@ En la versión 1.64.0, según el código fuente, no existe un presupuesto nativo
 
 | Control | Parámetro o componente | Qué previene | Cómo se verifica |
 |---|---|---|---|
-| Tope de handoffs | `max_handoffs=10` | Bucle infinito entre 2 agentes | `len(node_history) <= 10` |
+| Tope de handoffs / iteraciones | `max_handoffs=10`, `max_iterations=8` | Bucle infinito entre 2 agentes | `len(node_history) <= 8` |
 | Timeout de ejecución | `execution_timeout=300.0` | Swarm que consume tiempo indefinido | Tiempo total < 300 s |
 | Timeout por nodo | `node_timeout=60.0` | Agente lento bloquea el swarm | `FAILED` a los 60 s; el nodo no aparece en `node_history` |
-| Ping-pong | `window=8`, `min_unique=3` | Dos agentes se pasan el control | Razón = `repetitive_handoff` |
-| Presupuesto de tokens | `BudgetGuard` (propio) | Costo descontrolado | `budget_exceeded` en log |
+| Ping-pong | `window=6`, `min_unique=3` | Dos agentes se pasan el control | Razón = `repetitive_handoff` |
+| Presupuesto de tokens | `BudgetAwareSwarm` (propio) | Costo descontrolado | `budget_exceeded` en log |
 
-Los primeros tres son nativos del SDK, encendidos a propósito con valores más bajos que los defaults. El cuarto es nativo pero viene apagado; lo encendemos con `repetitive_handoff_detection_window=8` y `repetitive_handoff_min_unique_agents=3`. El quinto no existe en el SDK.
+Los separamos a propósito: como comparan el mismo contador (Hallazgo 2), con valores iguales la razón `max_iterations` nunca aparece. Con 8 y 10, cada razón es alcanzable y distinguible.
 
-El BudgetGuard lee `accumulated_usage.total_tokens` después de cada respuesta; si supera el umbral, devuelve `(False, 'budget_exceeded')`. El umbral se lee de la variable de entorno `BUDGET_GUARD_MAX_TOKENS` y el precio por token de `TOKEN_PRICE_PER_UNIT`; ninguno de los dos se hardcodea en el código de aplicación. La implementación propuesta envuelve `should_continue` del estado del swarm; como el estado se crea en cada ejecución, falta confirmar que el wrapper sobreviva entre invocaciones. Pendiente de verificar en la implementación.
+Los primeros tres son nativos del SDK, encendidos a propósito con valores más bajos que los defaults. El cuarto es nativo pero viene apagado; lo encendemos con `repetitive_handoff_detection_window=6` y `repetitive_handoff_min_unique_agents=3`. El quinto no existe en el SDK.
+
+El quinto control es `BudgetAwareSwarm`, una subclase de `Swarm` que sobreescribe `stream_async`. Tras cada evento del stream lee `self.state.accumulated_usage` y, si el total de tokens supera `BUDGET_GUARD_MAX_TOKENS`, emite `logger.debug("budget_exceeded")` y corta el generador. El SDK reporta ese corte como una excepción y el runner lo registra como `FAILED` con razón `budget_exceeded`. Es un corte por interrupción del stream, no una decisión del swarm: el diseño limpio sería fijar `completion_status` antes de salir, y queda anotado como mejora en ADR-003. El umbral y el precio por token (`TOKEN_PRICE_PER_UNIT`) se leen del entorno; ninguno se hardcodea. Elegimos la subclase porque el estado del swarm se crea en cada invocación, así que un wrapper sobre `should_continue` no sobrevive; lo comprobamos con un test que ejecuta un Swarm real.
 
 ### Observabilidad: la razón de parada es la métrica clave
 
@@ -97,7 +99,7 @@ Sin capturar la razón de parada no distingues "paró por ping-pong" de "falló 
 
 ```python
 # Namespace: SwarmGuard
-# Dimensiones: [config, scenario, stop_reason]
+# Dimensiones: [["config", "scenario", "stop_reason"], ["config"]]
 {
   "config": "guarded",
   "scenario": "ping_pong",
@@ -105,13 +107,24 @@ Sin capturar la razón de parada no distingues "paró por ping-pong" de "falló 
 }
 ```
 
+El segundo set, solo `config`, existe porque CloudWatch no agrega entre dimensiones: sin él, el dashboard y la alarma por configuración no verían datos.
+
 Sin esa dimensión, un dashboard de CloudWatch muestra que el swarm falló, pero no por qué. Con ella, puedes segmentar y comparar: los fallos de baseline, ¿son todos `max_handoffs`? Los de guarded, ¿son `repetitive_handoff` o `budget_exceeded`? Esa es la pregunta que el artículo 2 responde con números.
 
 ## 6. Cómo lo vamos a medir
 
-20 escenarios adversariales con el mismo input para baseline y guarded. Sin resultados todavía; este artículo es de diseño.
+20 escenarios adversariales con el mismo input para baseline y guarded. Los 40 casos (20 × 2 configuraciones) se comportan como se diseñaron en ejecución offline con un modelo guionado. Eso verifica la mecánica; no es una medición. Los números con Amazon Bedrock van en el artículo 2.
 
-Categorías de escenarios: ping-pong entre 2 agentes, cadena de delegación infinita, agente lento, terminación prematura por inyección, handoff a sí mismo, handoff a agente inexistente, inflado de contexto, inyección entre agentes vía shared context, tarea imposible y caso feliz como control. Cada escenario se define en un archivo YAML con el prompt de entrada, el vector de ataque y los resultados esperados para cada configuración. El mismo input se ejecuta contra baseline y guarded; la diferencia está en los controles, no en el prompt.
+Cuatro grupos de escenarios:
+
+- Controles de bucle (ping_pong, infinite_chain, self_handoff, context_inflation, cascade_backtrack, self_delegation_loop, role_conflict, malformed_json): `guarded` para antes y con una razón nombrada.
+- Timeouts (slow_node, zombie_agent, timeout_chain, tool_loop): ambas configs paran por `node_timeout`; `guarded` cinco veces antes.
+- Controles negativos (happy_path, premature_exit, unknown_agent, impossible_task): ningún control debe disparar.
+- Ataques de contenido fuera de alcance (shared_context_injection, privilege_escalation, memory_poisoning, data_exfiltration): los límites de bucle no los detectan y se incluyen para demostrarlo.
+
+El escenario `tool_loop` dejó un hallazgo propio: un bucle de herramienta dentro de un agente no mueve `node_history`, así que ningún límite de handoffs lo ve; solo `node_timeout` lo corta.
+
+Cada escenario se define en un archivo YAML con el prompt de entrada, el vector de ataque y los resultados esperados para cada configuración. El mismo input se ejecuta contra baseline y guarded; la diferencia está en los controles, no en el prompt.
 
 Para "handoff a agente inexistente", el SDK no falla: `handoff_to_agent` devuelve un error como resultado de la herramienta y el agente continúa. Es un escenario donde baseline y guarded deberían comportarse igual; sirve para comprobar que los controles no introducen falsos positivos.
 
@@ -130,6 +143,8 @@ Las pruebas son sintéticas. Los escenarios usan un modelo scripted en tests uni
 ## 8. Repo y reproducción
 
 Repositorio: https://github.com/miguelgrasso/swarm-guard
+
+Tag `baseline`: fase A completa, 101 tests sin red ni credenciales. Diagramas en `docs/diagrams/`.
 
 El repo incluye IaC en CloudFormation para us-east-2 (roles IAM por agente con `Deny` explícito a acciones mutantes, log groups, dashboard y alarma de presupuesto), datos sintéticos para los 20 escenarios y un script de limpieza (`scripts/cleanup.sh`) que destruye todos los recursos y verifica que no quedan huérfanos.
 
@@ -160,8 +175,6 @@ El artículo 2 ejecuta el benchmark con Bedrock real contra los 20 escenarios. P
 
 ## Pendiente antes de publicar
 
-1. Crear el tag `baseline` cuando termine la fase A.
-2. Verificar que el wrapper de BudgetGuard sobrevive entre invocaciones de `should_continue`.
-3. Confirmar nombres finales de los agentes (Researcher, Analyst, Writer) en `design.md`.
-4. Confirmar en el README de strands-decider-patterns las cifras de 60 llamadas LLM y 5 USD; si no aparecen, eliminar esa frase de la sección 2.
-5. Rellenar URL_TWEET con el enlace a la publicación de Peter Steinberger.
+1. Confirmar en el README de strands-decider-patterns las cifras de 60 llamadas LLM y 5 USD; si no aparecen, eliminar esa frase de la sección 2.
+2. Rellenar URL_TWEET con el enlace a la publicación de Peter Steinberger.
+3. Exportar los tres diagramas a PNG en `docs/img/` e insertarlos en las secciones 3 y 5.
