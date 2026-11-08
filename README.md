@@ -1,152 +1,140 @@
-# swarm-guard
+# 🛑 swarm-guard
 
-The brakes on a Strands Agents Swarm come turned off from the factory. This repo measures them on and off against 20 adversarial scenarios.
+**The brakes on a Strands Agents Swarm come turned off from the factory.**
+This repo proves it against the SDK source, turns them on, and measures the difference across 20 adversarial scenarios.
 
-## Overview
+[![tests](https://img.shields.io/badge/tests-101%20passed-brightgreen)](#-quick-start) [![sdk](https://img.shields.io/badge/strands--agents-1.64.0%20pinned-blue)](pyproject.toml) [![region](https://img.shields.io/badge/aws-us--east--2-orange)](infra/) [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](LICENSE)
 
-`swarm-guard` is a reproducible benchmark that demonstrates the security controls of the Swarm pattern in Strands Agents are **disabled by default** and measures the impact of enabling them against 20 adversarial scenarios.
+> 📝 Article 1 (design & findings, Spanish): [`docs/article-1.md`](docs/article-1.md) · 📊 Article 2 (live benchmark on Amazon Bedrock): pending · 🇪🇸 [Resumen en español](#-resumen-en-español)
 
-The project compares two configurations:
+---
 
-| Configuration | Description |
-|---|---|
-| `baseline` | SDK defaults (max_handoffs=20, max_iterations=20, ping-pong detection off) |
-| `guarded` | 4 SDK controls enabled + custom token budget guard |
+## 🧭 The problem in one picture
 
-Three specialized agents (researcher, analyst, writer) execute each scenario. Metrics are emitted via CloudWatch EMF with dimensions `[config, scenario, stop_reason]`.
-
-## Architecture
+In a Swarm nobody is in charge. Each agent decides who gets the work next. Two agents can hand it back and forth until time and tokens run out.
 
 ```mermaid
-graph TD
-    subgraph "Entry Points"
-        CLI["scripts/run_benchmark.py\n--config --scenario"]
-        CMP["scripts/compare_runs.py"]
+sequenceDiagram
+    autonumber
+    participant U as 👤 Task
+    participant R as 🔎 Researcher
+    participant A as 📊 Analyst
+    participant W as ✍️ Writer
+    U->>R: "Summarize Q3 incidents"
+    R->>A: handoff_to_agent("analyst")
+    A->>R: handoff_to_agent("researcher") — "need more data"
+    R->>A: handoff ...
+    A->>R: handoff ...
+    Note over R,A: 🔁 ping-pong — nobody calls W
+    rect rgb(255, 235, 235)
+    Note over R,A: baseline (SDK defaults): runs until handoff 20 or 15 min ⏱️💸
     end
-
-    subgraph "Core: src/swarm_guard/"
-        Runner["Runner\nrunner.py"]
-        Factory["SwarmFactory\n(inline in configs)"]
-        BL["BaselineConfig\nconfigs/baseline.py"]
-        GD["GuardedConfig\nconfigs/guarded.py"]
-        BG["BudgetGuard\nbudget_guard.py"]
-        SRI["StopReasonInterceptor\nobservability/stop_reason.py"]
-        EMF["EMFEmitter\nobservability/emf.py"]
-        SL["ScenarioLoader\n(part of runner.py)"]
+    rect rgb(230, 255, 235)
+    Note over R,A: guarded: repetitive_handoff fires at node 6 ✂️
     end
-
-    subgraph "Agents: src/swarm_guard/agents/"
-        R["Researcher\nresearcher.py"]
-        A["Analyst\nanalyst.py"]
-        W["Writer\nwriter.py"]
-    end
-
-    subgraph "Strands SDK"
-        SDK["strands.multiagent.Swarm\nSwarmConfig\nStatus\naccumulated_usage"]
-        LOG["logging.getLogger('strands')\nDEBUG level"]
-    end
-
-    subgraph "Scenarios"
-        YAML["scenarios/adversarial/\n20 x .yaml"]
-    end
-
-    subgraph "Outputs"
-        JSON["benchmark_results.json"]
-        MD["docs/findings.md"]
-        CW["CloudWatch EMF\n(stdout to CW Agent)"]
-    end
-
-    CLI --> Runner
-    Runner --> SL
-    SL --> YAML
-    Runner --> BL
-    Runner --> GD
-    BL --> Factory
-    GD --> Factory
-    GD --> BG
-    Factory --> SDK
-    Factory --> R
-    Factory --> A
-    Factory --> W
-    Runner --> SRI
-    SRI --> LOG
-    SDK --> LOG
-    Runner --> EMF
-    EMF --> CW
-    Runner --> JSON
-    CMP --> JSON
-    CMP --> MD
-    BG --> SDK
 ```
 
-## Prerequisites
+<!-- ![Swarm sin frenos](docs/img/02-swarm-sin-frenos.png) -->
+<!-- ![Swarm con frenos](docs/img/03-swarm-con-frenos.png) -->
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) package manager
-- AWS account with access to Amazon Bedrock in `us-east-2` (for live runs only)
+## 🔍 What the SDK ships (verified against `strands-agents` 1.64.0 source)
 
-## Quick Start
+| # | Finding | Where |
+|---|---|---|
+| 1 | 🔕 Ping-pong detection is **off by default** (`window=0`, `min_unique_agents=0`) | `SwarmState.should_continue` |
+| 2 | 🔁 `max_handoffs` and `max_iterations` compare the **same counter** (`len(node_history)`); the lower one wins | `SwarmState.should_continue` |
+| 3 | 🤫 When a limit fires the swarm ends `FAILED` and the **reason only goes to `logger.debug`** — it is not in the result | `Swarm.stream_async` |
+| 4 | 🚪 An agent that answers without `handoff_to_agent` ends the swarm `COMPLETED`, even with the task half done | `Swarm._handle_handoff` |
+| 5 | ⏱️ `node_timeout` fails the **whole swarm**; the timed-out node never enters `node_history` | `_stream_with_timeout` |
+| 6 | 💸 There is **no token or cost budget**; `accumulated_usage` is exposed but never enforced | `SwarmResult` |
+
+Each finding has a unit test that runs a **real `Swarm`** offline (`tests/unit/test_defaults.py`).
+
+## 🎛️ Two configurations, same input
+
+| Control | `baseline` (SDK defaults) | `guarded` |
+|---|---|---|
+| 🔁 `max_handoffs` / `max_iterations` | 20 / 20 | 10 / 8 — set apart on purpose so each stop reason is reachable |
+| ⏱️ `execution_timeout` / `node_timeout` | 900 s / 300 s | 300 s / 60 s |
+| 🏓 Ping-pong detection | off | `window=6`, `min_unique_agents=3` |
+| 💸 Token budget | none | `BudgetAwareSwarm` (ours) — `BUDGET_GUARD_MAX_TOKENS` |
+| 📡 Stop reason → CloudWatch EMF | — | dims `[config, scenario, stop_reason]` + `[config]` |
+
+## 🧪 20 adversarial scenarios
+
+Same prompt, both configs, scripted model offline (40/40 behave as designed). Live numbers on Bedrock come in article 2.
+
+| Type | Scenarios | What they show |
+|---|---|---|
+| 🔁 Loop controls | ping_pong, infinite_chain, self_handoff, context_inflation, cascade_backtrack, self_delegation_loop, role_conflict, malformed_json | `guarded` stops earlier and for a *named* reason |
+| ⏱️ Timeouts | slow_node, zombie_agent, timeout_chain, tool_loop | both stop by `node_timeout`; `guarded` 5× sooner |
+| ✅ Negative controls | happy_path, premature_exit, unknown_agent, impossible_task | controls must **not** fire |
+| 🛡️ Out of scope (content attacks) | shared_context_injection, privilege_escalation, memory_poisoning, data_exfiltration | loop limits **do not** catch these — that is the point |
+
+Full table with expected stop reasons: [`scenarios/adversarial/`](scenarios/adversarial/).
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+    subgraph run["🧪 Benchmark runner"]
+        Y["📄 scenarios/*.yaml"] --> RN["runner.py"]
+        RN --> CFG{"config?"}
+        CFG -->|baseline| SW["🐝 strands Swarm"]
+        CFG -->|guarded| BG["🐝 BudgetAwareSwarm\n(subclass)"]
+        BG --> SW
+    end
+    subgraph agents["🤖 Agents (one IAM role each)"]
+        SW --> R["🔎 Researcher"]
+        SW --> A["📊 Analyst"]
+        SW --> W["✍️ Writer"]
+    end
+    R & A & W --> BR["🧠 Amazon Bedrock\n(us-east-2)"]
+    SW -. "logger.debug(reason)" .-> SRI["🎧 StopReasonInterceptor"]
+    SRI --> EMF["📡 EMF emitter"]
+    EMF --> CW["📈 Amazon CloudWatch\nmetrics · dashboard · alarm"]
+    RN --> OUT["📋 results.json → docs/findings.md"]
+```
+
+<!-- ![Arquitectura AWS](docs/img/01-arquitectura-aws.png) -->
+
+Infrastructure (CloudFormation, `infra/template.yaml`): 3 IAM roles with explicit `Deny` on mutating actions, log group, dashboard, budget alarm. Everything in **us-east-2**. `scripts/cleanup.sh` tears it all down and verifies nothing is left.
+
+## 🚀 Quick start
 
 ```bash
-# Install dependencies
 uv sync
-
-# Run unit tests (no AWS credentials needed)
-uv run pytest tests/unit/ -v
+uv run pytest tests/unit/ -v        # 101 tests, no AWS credentials, no network
+uv run ruff check . && uv run mypy src/
 ```
 
-## Running Benchmarks
+Live runs (after Bedrock access):
 
 ```bash
-# Set environment variables
-cp .env.example .env
-# Edit .env with your settings
-
-# Run a single scenario
-uv run python scripts/run_benchmark.py --config guarded --scenario scenario_02_ping_pong
-
-# Run all scenarios with both configs
+cp .env.example .env                # set BEDROCK_MODEL_ID, BUDGET_GUARD_MAX_TOKENS
 uv run python scripts/run_benchmark.py --config all
-
-# Compare two runs and generate findings table
-uv run python scripts/compare_runs.py baseline.json guarded.json
+uv run python scripts/compare_runs.py baseline.json guarded.json   # → docs/findings.md
+uv run pytest -m integration        # Bedrock-backed tests
+bash scripts/cleanup.sh             # destroy the stack, verify no orphans
 ```
 
-## Infrastructure
+## ⚠️ Validity limits
 
-Infrastructure is defined as CloudFormation templates in `infra/`. All resources are created in `us-east-2`.
+- Findings are tied to **strands-agents 1.64.0** (pinned). Newer versions may change them.
+- Offline runs use a scripted model: they verify the mechanics, **they are not a benchmark**.
+- Cost = `tokens × TOKEN_PRICE_PER_UNIT`, read from the environment, never hardcoded.
+- Loop limits say nothing about answer quality, and nothing about content attacks (see out-of-scope row).
 
-- `infra/template.yaml` — CloudFormation stack (IAM roles, CloudWatch log groups, dashboards, budget alarm)
-- `infra/parameters.json` — Parameters without real values
+## 📚 Docs
 
-```bash
-# Cleanup all AWS resources and verify no orphans remain
-bash scripts/cleanup.sh
-```
+- [`docs/article-1.md`](docs/article-1.md) — design & findings (ES)
+- [`docs/adr/`](docs/adr/) — Swarm vs Graph · stop-reason capture · budget guard · CloudFormation vs CDK
+- [`.kiro/specs/swarm-guard/`](.kiro/specs/swarm-guard/) — requirements, design, tasks
 
-## Contributing
+## 🇪🇸 Resumen en español
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Ensure `ruff check .` and `mypy src/` pass
-4. Run `pytest tests/unit/ -v` before submitting
-5. Open a pull request
+`swarm-guard` demuestra que los frenos de un Swarm de Strands Agents vienen apagados de fábrica: la detección de ping-pong está desactivada, dos límites comparan el mismo contador, la razón de parada no llega al resultado y no existe presupuesto de tokens. Todo verificado contra el código fuente de la versión 1.64.0, con un test por hallazgo que ejecuta un Swarm real sin red ni credenciales. El proyecto compara `baseline` (defaults) contra `guarded` (controles encendidos más un presupuesto propio) en 20 escenarios adversariales, con la razón de parada como métrica en Amazon CloudWatch. Artículo 1 (diseño) en `docs/article-1.md`; artículo 2 (benchmark en Amazon Bedrock) pendiente.
 
-Code conventions:
-
-- Identifiers and inline comments in English
-- `ruff` and `mypy --strict` must pass without errors
-- Unit tests use a scripted model (no network calls)
-- Integration tests are marked with `@pytest.mark.integration`
-
-## Resumen en español
-
-`swarm-guard` demuestra que los frenos de un Swarm de Strands Agents vienen apagados de fábrica.
-El proyecto mide el comportamiento del swarm con y sin controles frente a 20 escenarios adversariales.
-Compara dos configuraciones: `baseline` (defaults del SDK) y `guarded` (controles encendidos).
-Los hallazgos están verificados contra el código fuente de strands-agents 1.64.0.
-Artículo 1 (diseño) en `docs/article-1.md`; artículo 2 (resultados) pendiente.
-
-## License
+## 📄 License
 
 Apache-2.0. See [LICENSE](LICENSE).
