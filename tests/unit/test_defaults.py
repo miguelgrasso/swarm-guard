@@ -230,3 +230,34 @@ def test_intra_agent_tool_loop_stops_on_node_timeout() -> None:
         assert interceptor.stop_reason == "node_timeout", (
             f"{config_name}: expected node_timeout, got {interceptor.stop_reason}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Fact 5c — execution_timeout: swarm fails when total execution exceeds limit
+# ---------------------------------------------------------------------------
+
+
+def test_swarm_fails_on_execution_timeout() -> None:
+    """A real swarm whose total execution exceeds execution_timeout terminates FAILED.
+
+    Three agents driven by SlowScriptedModel (1 s delay) with execution_timeout=0.3 s
+    and node_timeout=5.0 s.  The first node completes (1 s < 5 s node_timeout) but the
+    overall elapsed time (1 s) already exceeds execution_timeout (0.3 s), so the swarm
+    terminates with FAILED and stop_reason == "execution_timeout".
+
+    **Validates: Requirements 1.3**
+    """
+    from tests.unit.conftest import scenario_agents
+
+    agents = scenario_agents("timeout_chain", slow_delay_s=1.0)
+    swarm = Swarm(
+        nodes=agents,
+        max_handoffs=50,
+        execution_timeout=0.3,
+        node_timeout=5.0,
+    )
+
+    result, interceptor = _run(swarm, "process data through the pipeline")
+
+    assert result.status == Status.FAILED
+    assert interceptor.stop_reason == "execution_timeout"
