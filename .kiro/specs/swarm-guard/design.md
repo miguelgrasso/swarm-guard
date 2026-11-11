@@ -707,32 +707,38 @@ que lanza excepción antes de que `should_continue` sea llamado nuevamente). Est
 **## Contexto**
 
 El SDK de Strands no incluye ningún mecanismo nativo de presupuesto de tokens. El resultado del
-swarm expone `accumulated_usage.total_tokens` pero no lo usa para detener la ejecución. Para
+swarm expone `accumulated_usage.get("totalTokens", 0)` pero no lo usa para detener la ejecución. Para
 demostrar el valor añadido de la `GuardedConfig`, se necesita un control personalizado que detenga
 el swarm al superar un umbral de tokens configurable.
 
 **## Decisión**
 
-Implementar `BudgetGuard` como un **wrapper de `should_continue`** inyectado después de que
-`SwarmFactory` construye el swarm. Al retornar `False` desde `should_continue`, el SDK detiene el
-swarm de forma limpia (sin excepción), respetando el patrón de terminación nativo. Antes de
-retornar `False`, el guard emite `logger.debug("budget_exceeded")`, lo que permite que el
-`StopReasonInterceptor` lo capture de la misma forma que los límites nativos del SDK.
+Implementar `BudgetAwareSwarm(Swarm)`, una **subclase de Swarm** que sobreescribe `stream_async` para
+verificar `self.state.accumulated_usage.get("totalTokens", 0)` después de cada evento y emitir
+`logger.debug("budget_exceeded")` antes de retornar cuando el umbral se supera. El override vive en
+la clase, no en la instancia de estado, por lo que sobrevive el reset de `self.state = SwarmState(...)`
+que ocurre al inicio de cada invocación de `Swarm.stream_async` (swarm.py ~465). Este reset descarta
+cualquier monkey-patch sobre `swarm.state.should_continue` colocado después de la construcción,
+lo que hace inviable el enfoque de wrapper post-construcción.
 
 **## Alternativa considerada**
 
-**Subclase de Swarm:** crear `BudgetAwareSwarm(Swarm)` y sobreescribir `should_continue` a nivel
-de clase. Descartado porque requiere que todos los módulos importen la subclase en lugar del `Swarm`
-original, aumentando el acoplamiento y complicando `SwarmFactory`.
+**Wrapper post-construcción de `should_continue`:** inyectar una función envolvente sobre
+`swarm.state.should_continue` después de que `SwarmFactory` construye el swarm. Al retornar `False`
+el SDK detiene el swarm sin excepción. Descartado porque `Swarm.stream_async` re-crea `self.state` al
+inicio de cada invocación, descartando el monkey-patch antes de la primera evaluación del ciclo.
+Este hallazgo (verificado leyendo `strands-agents==1.64.0`, swarm.py ~465) es un resultado publicable
+del benchmark.
 
 **## Trade-offs**
 
-| Aspecto | Wrapper post-construcción | Subclase de Swarm |
+| Aspecto | Subclase de Swarm (stream_async) | Wrapper post-construcción |
 |---|---|---|
-| Invasividad | ✅ Mínima (solo en GuardedConfig) | ❌ Requiere cambio en todos los imports |
-| Pruebas unitarias | ✅ Se puede inyectar un mock de swarm | ⚠️ Más verboso |
-| Compatibilidad con actualizaciones del SDK | ✅ Solo depende de should_continue signature | ⚠️ Herencia puede romperse |
-| Transparencia de la configuración | ✅ GuardedConfig es el único punto de cambio | ❌ La diferencia está oculta en la jerarquía |
+| Sobrevive reset de SwarmState | ✅ El override vive en la clase | ❌ Descartado en cada invocación |
+| Invasividad | ⚠️ Requiere import de la subclase en SwarmFactory | ✅ Mínima (solo en GuardedConfig) |
+| Pruebas unitarias | ⚠️ Más verboso (Swarm real) | ✅ Se puede inyectar un mock de swarm |
+| Compatibilidad con actualizaciones del SDK | ⚠️ Herencia puede romperse | ✅ Solo depende de should_continue signature |
+| Acoplamiento a internals del SDK | ⚠️ Depende de stream_async signature | ✅ Solo depende de should_continue signature |
 
 ---
 

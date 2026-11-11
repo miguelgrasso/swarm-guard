@@ -759,7 +759,12 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
     - `test_guarded_stops_earlier_than_baseline`: comparar `total_handoffs` de `guarded` vs
       `baseline` para `ping_pong`; assert `guarded < baseline`
   - Validar también escenario 07 (`unknown_agent`): si el modelo insiste en reintentar handoffs
-    en lugar de responder sin handoff, actualizar el YAML a `max_handoffs` en ambas configs
+    en lugar de responder sin handoff, actualizar el YAML a `max_handoffs` en ambas configs.
+    **Importante:** si se cambia el YAML, también actualizar el script del scripted model en
+    `tests/unit/conftest.py` (la función `scenario_agents` para `unknown_agent`) para que el
+    researcher reintente handoffs en lugar de responder con texto, y re-ejecutar
+    `pytest tests/unit/test_offline_benchmark.py -v` para confirmar que los 40 casos siguen
+    pasando antes de continuar a B2
   - _Requirements: 1.1, 1.3, 1.4, 3.4, 8.4_
 
   **Criterio de verificación:** `pytest tests/integration/ -m integration -v` pasa todos los
@@ -783,11 +788,15 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
   - Ejecutar `python scripts/compare_runs.py benchmark_baseline_{ts}.json benchmark_guarded_{ts}.json`
   - Revisar `docs/findings.md` generado: verificar que la tabla es coherente, sin celdas vacías
     inesperadas, y que las métricas Δ reflejan la ventaja de GuardedConfig
-  - Commitear `docs/findings.md` al repo (esta es la versión de referencia con datos reales)
+  - **No commitear** esta versión de `docs/findings.md`: contiene datos reales de Bedrock y el
+    structure steering prohíbe commitearla (`.gitignore` la bloquea). La versión commiteable
+    (datos sintéticos) se maneja en B6
   - _Requirements: 6.2, 6.3_
 
   **Criterio de verificación:** `docs/findings.md` existe, contiene tabla con 20 filas de
-  escenarios más sección resumen; `CorrectStopRate` y `FalsePositiveRate` son valores entre 0 y 1.
+  escenarios más sección resumen; `CorrectStopRate` y `FalsePositiveRate` son valores entre 0 y 1;
+  el archivo NO está staged en git (verificar con `git status docs/findings.md` que aparece como
+  ignorado).
 
 - [ ] B4. Validación de observabilidad en CloudWatch
   - Verificar que el CloudWatch Agent en el entorno de ejecución recoge los registros EMF emitidos
@@ -805,6 +814,8 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
 
 - [ ] B5. Despliegue CloudFormation (opcional)
   - Completar `infra/parameters.json` con valores reales para `dev` (sin commitear los valores)
+  - Crear una copia local de `infra/parameters.json` como `infra/parameters-dev.json` (no commitear)
+    y llenar con valores reales para `dev`
   - Ejecutar `aws cloudformation deploy --stack-name swarm-guard-dev --template-file infra/template.yaml
     --parameter-overrides file://infra/parameters-dev.json --region us-east-2 --capabilities CAPABILITY_IAM`
   - Verificar outputs del stack: 8 outputs esperados
@@ -821,7 +832,9 @@ de seguridad del patrón Swarm en Strands Agents están desactivados por defecto
     `docs/findings.md` local con datos reales
   - Crear repo público en GitHub con nombre `swarm-guard`
   - Push del branch principal con README, `docs/findings.md` de referencia (datos sintéticos
-    o datos reales anonimizados), LICENSE
+    únicamente — el steering prohíbe commitear datos reales de Bedrock), LICENSE. Usar
+    `git add -f docs/findings.md` para forzar el add ya que `.gitignore` bloquea el archivo por
+    defecto
   - Crear un issue de ejemplo en el repo titulado "Add scenario: [attack_vector]" documentando
     cómo la comunidad puede contribuir nuevos escenarios
   - _Requirements: 8.7, 4.7_
